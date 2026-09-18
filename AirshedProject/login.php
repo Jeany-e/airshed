@@ -61,7 +61,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             justify-content: center;
             background: var(--blue-anim);
             background-size: 280% 280%;
-            animation: gradientBG 24s ease-in-out infinite;
             overflow: hidden;
         }
 
@@ -82,7 +81,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             text-align: center;
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.5);
-            animation: authPanelFloat 10s ease-in-out infinite;
             position: relative;
         }
 
