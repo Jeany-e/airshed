@@ -211,22 +211,23 @@ include "config.php";
             .navbar {
                 flex-direction: column;
                 align-items: stretch;
-                padding: 0.65rem 4% 0.75rem;
+                padding: 0.55rem 12px 0.7rem;
                 gap: 7px;
             }
 
             .navbar h2 {
-                font-size: 24px;
-                letter-spacing: -0.8px;
+                font-size: 20px;
+                letter-spacing: -0.6px;
                 text-align: center;
             }
 
             .nav-actions {
                 display: grid;
-                grid-template-columns: repeat(2, minmax(0, max-content));
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 width: 100%;
+                max-width: 320px;
                 gap: 6px;
-                justify-content: end;
+                align-self: center;
             }
 
             .btn-link,
@@ -234,26 +235,24 @@ include "config.php";
                 width: 100%;
                 box-sizing: border-box;
                 text-align: center;
-                min-height: 28px;
+                min-height: 32px;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                padding: 4px 5px;
+                padding: 5px 6px;
                 font-size: 9px;
                 border-radius: 8px;
-                width: auto;
-                min-width: 116px;
-                justify-self: end;
+                min-width: 0;
+                justify-self: stretch;
             }
 
             .btn-report {
                 grid-column: 1 / -1;
-                min-height: 30px;
-                border-radius: 8px;
+                min-height: 34px;
+                border-radius: 9px;
                 background: var(--danger);
                 box-shadow: 0 6px 14px rgba(217,75,75,0.18);
-                min-width: 184px;
-                justify-self: end;
+                min-width: 0;
             }
 
             .btn-link { background: #eef7ff; border-color: #c7e3f4; }
