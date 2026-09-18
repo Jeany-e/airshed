@@ -1,0 +1,44 @@
+{
+  "rules": {
+    "sensor_logs": {
+      ".read": true,
+      ".write": false,
+      ".indexOn": ["timestamp"]
+    },
+    "sensor_data": {
+      ".read": false,
+      ".write": false
+    },
+    "users": {
+      ".read": false,
+      ".write": false
+    },
+    "pollution_reports": {
+      ".read": false,
+      ".write": false
+    },
+    "audit_logs": {
+      ".read": false,
+      ".write": false
+    },
+    "activity_logs": {
+      ".read": false,
+      ".write": false
+    },
+    "feedback": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": ["timestamp"]
+    },
+    "alert_logs": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": ["timestamp"]
+    },
+    "alert_delivery_logs": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": ["timestamp"]
+    }
+  }
+}

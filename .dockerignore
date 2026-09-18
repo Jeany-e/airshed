@@ -1,0 +1,4 @@
+PHPMailer-master/test/
+.git/
+.env
+*.log

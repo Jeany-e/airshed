@@ -1,0 +1,18 @@
+{
+  "hosting": {
+    "public": "AirshedProject",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "airshed-php",
+          "region": "asia-southeast1"
+        }
+      }
+    ]
+  },
+  "database": {
+    "rules": "database.rules.json"
+  }
+}
