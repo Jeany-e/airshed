@@ -175,13 +175,20 @@ foreach ($selectedLogs as $log) {
             .metric { padding: 16px; }
             .metric-value { font-size: 25px; }
             .panel-head { align-items: flex-start; flex-direction: column; }
+            .panel-actions { width: 100%; flex-wrap: wrap; }
+            .panel-actions .export-btn {
+                width: auto;
+                align-self: flex-end;
+                padding: 7px 10px;
+                font-size: 11px;
+            }
             .table-wrap { max-height: 52vh; }
             th, td { padding: 13px 15px; }
             .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-            table { min-width: 520px; }
+            table { min-width: 720px; }
         }
 
-        @media (max-width: 420px) {
+        @media (max-width: 760px) {
             .header {
                 flex-direction: column;
                 align-items: flex-start;
@@ -224,6 +231,37 @@ foreach ($selectedLogs as $log) {
             .date-form input,
             .date-form .search-btn {
                 width: 100%;
+            }
+
+            .table-wrap {
+                overflow-x: hidden;
+            }
+
+            .table-wrap table {
+                min-width: 0;
+                width: 100%;
+                table-layout: fixed;
+            }
+
+            .table-wrap th,
+            .table-wrap td {
+                min-width: 0;
+                padding: 9px 4px;
+                font-size: 10px;
+                line-height: 1.35;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                vertical-align: middle;
+            }
+
+            .table-wrap th {
+                font-size: 8px;
+                letter-spacing: 0;
+            }
+
+            .table-wrap .status {
+                padding: 4px 5px;
+                font-size: 9px;
             }
         }
         .mobile-menu-toggle, .sidebar-backdrop { display: none; }

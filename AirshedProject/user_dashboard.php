@@ -88,6 +88,8 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         .range-selector { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
         .range-button { min-width: 70px; padding: 11px 18px; border-radius: 999px; border: 1px solid #c9e4f2; background: #eef8ff; color: #38566e; font-weight: 700; cursor: pointer; transition: all 0.25s ease; }
         .range-button.active, .range-button:hover { background: var(--primary); color: #fff; box-shadow: 0 12px 24px rgba(23,78,166,0.18); }
+        .prediction-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; }
+        .ai-insight { font-size: 18px; line-height: 1.6; min-height: 80px; font-weight: 600; color: #333; }
         .selected-forecast { display: flex; flex: 1 1 100%; width: 100%; min-width: 0; flex-direction: column; justify-content: center; align-items: center; background: #fff; border: 1px solid #c9e4f2; border-radius: 24px; padding: 22px; box-shadow: 0 12px 26px rgba(36,104,157,0.12); animation: panelFloat 5.5s ease-in-out .7s infinite; }
         .selected-forecast label { font-size: 10px; font-weight: 800; color: #7f7f9a; text-transform: uppercase; letter-spacing: 0.12em; }
         .selected-forecast-value { font-size: 32px; font-weight: 900; margin-top: 10px; color: var(--primary); }
@@ -138,6 +140,19 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             .card { padding: 18px 12px; }
             .val { font-size: 34px; }
             .ai-panel { padding: 22px; }
+            .prediction-controls {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 6px;
+            }
+            .prediction-controls > span { grid-column: 1 / -1; }
+            .range-button {
+                min-width: 0;
+                width: 100%;
+                padding: 9px 4px;
+                font-size: 11px;
+            }
+            .ai-insight { font-size: 15px; line-height: 1.45; min-height: 0; }
             .history-table-wrap { max-height: 48vh; overflow: auto; }
             .history-card table { min-width: 540px; }
             .history-card th { position: sticky; top: 0; z-index: 1; background: #fff; }
@@ -205,9 +220,27 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 gap: 8px;
             }
 
+            .prediction-controls {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 6px;
+            }
+
+            .prediction-controls > span {
+                grid-column: 1 / -1;
+            }
+
             .range-button {
-                min-width: 58px;
-                padding: 9px 12px;
+                min-width: 0;
+                width: 100%;
+                padding: 9px 4px;
+                font-size: 11px;
+            }
+
+            .ai-insight {
+                font-size: 15px;
+                line-height: 1.45;
+                min-height: 0;
             }
 
             .selected-forecast {
@@ -228,6 +261,10 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
             .history-card table {
                 min-width: 490px;
+            }
+
+            .history-table-wrap table {
+                min-width: 620px;
             }
 
             th,
@@ -327,9 +364,9 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 <div class="ai-panel">
                     <div style="font-weight:800; color:var(--ai-purple); font-size:14px; margin-bottom:10px;">🤖 AI ADVISOR</div>
                     <span id="statusText" class="status-badge">...</span>
-                    <div id="aiInsight" style="font-size: 18px; line-height: 1.6; min-height: 80px; font-weight: 600; color:#333;">Waiting for data stream...</div>
+                    <div id="aiInsight" class="ai-insight">Waiting for data stream...</div>
                     <div class="range-selector">
-                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; width:100%;">
+                        <div class="prediction-controls">
                             <span style="font-size:12px; font-weight:800; color:#555;">Prediction Range:</span>
                             <button class="range-button active" onclick="setPredictionRange(5,this)">5m</button>
                             <button class="range-button" onclick="setPredictionRange(60,this)">1h</button>

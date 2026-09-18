@@ -360,7 +360,7 @@ include "config.php";
             }
 
             .sensor-log-box table {
-                min-width: 360px;
+                min-width: 620px;
             }
 
             table {

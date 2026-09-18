@@ -248,10 +248,20 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
             }
 
             .table-scroll,
-            .history-table-wrap,
+            .history-table-wrap {
+                overflow-x: hidden;
+            }
+
             .chart-scroll {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+            }
+
+            .table-scroll table,
+            .history-table-wrap table {
+                min-width: 0;
+                width: 100%;
+                table-layout: fixed;
             }
 
             .chart-track {
@@ -260,8 +270,11 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
 
             th,
             td {
-                font-size: 11px;
-                padding: 9px 8px;
+                font-size: 10px;
+                line-height: 1.35;
+                padding: 9px 4px;
+                overflow-wrap: anywhere;
+                vertical-align: middle;
             }
         }
 
@@ -473,6 +486,15 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
 
             .table-container {
                 padding: 14px 10px;
+            }
+
+            .table-container .export-btn {
+                float: none;
+                display: inline-block;
+                width: auto;
+                margin-bottom: 10px;
+                padding: 7px 10px;
+                font-size: 11px;
             }
 
             .admin-status-strip {
@@ -764,7 +786,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         <div id="v-net" class="view-section">
             <div class="card" style="text-align: left; border-top: 5px solid var(--accent);">
                 <h3 style="color: var(--primary);">Connected IoT Network</h3>
-                <table style="width: 100%;">
+                <div class="table-scroll"><table style="width: 100%;">
                     <thead>
                         <tr><th>Device Name</th><th>IP Address</th><th>Status</th><th>Last Communication</th></tr>
                     </thead>
@@ -776,7 +798,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                             <td id="lastSync">--</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
         <div id="v-feedback" class="view-section">

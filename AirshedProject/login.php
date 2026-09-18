@@ -48,7 +48,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <style>
         :root {
             --primary: #174ea6;
-            --blue-anim: linear-gradient(135deg, #78c5ef, #bce8fa, #4f9bd3);
+            --blue-anim: linear-gradient(135deg, #b8e1f7, #86c6ec, #d7f0ff, #69addb);
         }
 
         body {
@@ -60,8 +60,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             align-items: center;
             justify-content: center;
             background: var(--blue-anim);
-            background-size: 240% 240%;
-            animation: gradientBG 15s ease infinite;
+            background-size: 280% 280%;
+            animation: gradientBG 24s ease-in-out infinite;
             overflow: hidden;
         }
 
@@ -73,23 +73,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         .login-container {
             background: rgba(255, 255, 255, 0.98);
-            padding: 40px 50px 60px 50px; /* Adjusted padding */
+            padding: 32px 40px 44px;
+            box-sizing: border-box;
             border-radius: 30px;
             box-shadow: 0 25px 60px rgba(0,0,0,0.4);
             width: 90%;
-            max-width: 480px; 
+            max-width: 440px;
             text-align: center;
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.5);
-            animation: authPanelFloat 5.5s ease-in-out infinite;
+            animation: authPanelFloat 10s ease-in-out infinite;
             position: relative;
         }
 
         @keyframes authPanelFloat {
-            0% { opacity: 0; transform: translateY(40px); }
-            14% { opacity: 1; transform: translateY(0); }
-            50% { opacity: 1; transform: translateY(-6px); }
-            100% { opacity: 1; transform: translateY(0); }
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-4px); }
         }
 
         /* NEW: Back Button Styling */
@@ -242,9 +241,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
 
             .login-container {
-                width: 92%;
+                width: 90%;
                 max-width: 420px;
-                padding: 26px 18px 32px;
+                padding: 24px 16px 30px;
                 border-radius: 22px;
             }
 
