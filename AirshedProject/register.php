@@ -52,8 +52,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Register | City Airshed MS</title>
     <style>
         :root {
-            --primary: #1a237e;
-            --blue-anim: linear-gradient(-45deg, #1a237e, #311b92, #1e88e5, #3949ab);
+            --primary: #174ea6;
+            --blue-anim: linear-gradient(135deg, #78c5ef, #bce8fa, #4f9bd3);
         }
 
         body {
@@ -62,7 +62,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             min-height: 100vh;
             display: flex; align-items: center; justify-content: center;
             background: var(--blue-anim);
-            background-size: 400% 400%;
+            background-size: 240% 240%;
             animation: gradientBG 15s ease infinite;
             overflow-x: hidden;
         }
@@ -84,12 +84,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.5);
             margin: 40px 20px;
-            animation: slideUp 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: authPanelFloat 5.5s ease-in-out infinite;
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes authPanelFloat {
+            0% { opacity: 0; transform: translateY(40px); }
+            14% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-6px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
         /* Back Button Styling */
@@ -128,7 +130,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background: #f1f5f9; transition: 0.3s;
         }
 
-        input:focus { border-color: var(--primary); background: #fff; outline: none; box-shadow: 0 0 0 4px rgba(26, 35, 126, 0.1); }
+        input:focus { border-color: var(--primary); background: #fff; outline: none; box-shadow: 0 0 0 4px rgba(23, 78, 166, 0.1); }
 
         button {
             width: 100%; padding: 16px;
@@ -136,10 +138,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border: none; border-radius: 12px;
             font-size: 18px; font-weight: 700;
             cursor: pointer; transition: 0.3s; margin-top: 15px;
-            box-shadow: 0 10px 20px rgba(26, 35, 126, 0.2);
+            box-shadow: 0 10px 20px rgba(23, 78, 166, 0.2);
         }
 
-        button:hover { background: #0d145a; transform: translateY(-2px); box-shadow: 0 15px 25px rgba(26, 35, 126, 0.3); }
+        button:hover { background: #123d82; transform: translateY(-2px); box-shadow: 0 15px 25px rgba(23, 78, 166, 0.3); }
 
         .error-msg { background: #fef2f2; color: #b91c1c; padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #fee2e2; font-weight: 600; }
         .success-msg { background: #f0fdf4; color: #15803d; padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; border: 1px solid #dcfce7; font-weight: 600; }

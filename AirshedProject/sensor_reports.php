@@ -86,7 +86,8 @@ foreach ($selectedLogs as $log) {
             --background: #f5f7fb;
         }
         * { box-sizing: border-box; }
-        body { margin: 0; background: var(--background); color: var(--ink); font-family: 'DM Sans', sans-serif; }
+        body { margin: 0; background: linear-gradient(120deg, #d5efff, #f8fcff, #c6e9fb); background-size: 300% 300%; animation: pageBlueFlow 11s ease-in-out infinite; color: var(--ink); font-family: 'DM Sans', sans-serif; }
+        @keyframes pageBlueFlow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         .topbar { background: var(--surface); border-bottom: 1px solid var(--line); padding: 18px 5%; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
         .brand { color: var(--ink); font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 700; text-decoration: none; }
         .topnav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -103,8 +104,15 @@ foreach ($selectedLogs as $log) {
         .search-btn { border: 0; border-radius: 8px; padding: 10px 14px; background: var(--blue); color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
         .clear-search { color: var(--muted); font-size: 12px; font-weight: 700; text-decoration: none; }
         .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-        .metric, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 8px 24px rgba(20, 33, 61, .04); }
-        .metric { padding: 20px; }
+        .metric, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 14px 30px rgba(36,104,157,.14), 0 3px 0 rgba(255,255,255,.9) inset; animation: cardRise .6s ease both, cardFloat 5.5s ease-in-out .7s infinite; }
+        .metric { padding: 20px; transition: transform .25s ease, box-shadow .25s ease; }
+        .metric:hover, .panel:hover { transform: translateY(-6px); box-shadow: 0 18px 30px rgba(45,112,164,.22); }
+        .metric:nth-child(2) { animation-delay: .08s; }
+        .metric:nth-child(3) { animation-delay: .16s; }
+        .metric:nth-child(4) { animation-delay: .24s; }
+        @keyframes cardRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes cardFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
+        @media (prefers-reduced-motion: reduce) { .metric, .panel { animation: none; } }
         .metric-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
         .metric-value { display: block; color: var(--blue); font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; margin-top: 9px; }
         .panel { overflow: hidden; }
@@ -128,14 +136,14 @@ foreach ($selectedLogs as $log) {
         .empty, .error { padding: 42px 22px; color: var(--muted); text-align: center; }
         .error { color: #b42318; background: #fff5f4; }
         .app-shell { min-height: 100vh; display: flex; }
-        .sidebar { width: 280px; flex: 0 0 280px; background: linear-gradient(-45deg, #1a237e, #311b92, #1e88e5, #3949ab); background-size: 400% 400%; animation: sidebarGradient 10s ease infinite; color: #fff; padding: 30px 20px; display: flex; flex-direction: column; box-shadow: 4px 0 10px rgba(0,0,0,.2); }
+        .sidebar { width: 280px; flex: 0 0 280px; background: linear-gradient(135deg, #78c5ef, #bce8fa, #4f9bd3); background-size: 240% 240%; animation: sidebarGradient 8s ease-in-out infinite; color: #fff; padding: 30px 20px; display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(36,104,157,.18); }
         @keyframes sidebarGradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .sidebar h2 { font-family: 'DM Sans', sans-serif; font-size: 20px; text-align: center; border-bottom: 2px solid rgba(255,255,255,.15); padding-bottom: 20px; margin: 0 0 20px; }
-        .sidebar-link { color: rgba(255,255,255,.82); text-decoration: none; padding: 15px 20px; border-radius: 10px; margin: 8px 0; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 600; }
-        .sidebar-link:hover, .sidebar-link.active { background: #fff; color: #1a237e; }
+        .sidebar h2 { font-family: 'DM Sans', sans-serif; font-size: 20px; text-align: center; color: #174ea6; border-bottom: 2px solid rgba(255,255,255,.1); padding-bottom: 20px; margin: 0 0 20px; }
+        .sidebar-link { color: #17466f; text-decoration: none; padding: 15px 20px; border-radius: 10px; margin: 8px 0; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 600; transition: all .3s ease; }
+        .sidebar-link:hover, .sidebar-link.active { background: #fff; color: #174ea6; }
         .sidebar-link.active { font-weight: 700; box-shadow: 0 5px 15px rgba(0,0,0,.18); }
-        .sidebar-logout { margin-top: auto; color: #fff; text-decoration: none; text-align: center; padding: 14px; border: 1px solid rgba(255,255,255,.3); border-radius: 10px; font-weight: 700; }
-        .sidebar-note { color: rgba(255,255,255,.7); font-size: 12px; line-height: 1.5; margin: 0 8px 18px; }
+        .sidebar-logout { margin-top: 20px; color: #17466f; text-decoration: none; text-align: center; padding: 15px; border: 1px solid rgba(23,78,166,.18); background: rgba(255,255,255,.28); border-radius: 10px; font-weight: 700; }
+        .sidebar-note { color: #38566e; font-size: 12px; line-height: 1.5; margin: 0 8px 18px; }
         .main { min-width: 0; flex: 1; }
         .header { background: #fff; border-bottom: 1px solid var(--line); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
         .header-title { color: #1a237e; font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; }
@@ -151,8 +159,11 @@ foreach ($selectedLogs as $log) {
             .app-shell { display: block; }
             .sidebar { width: 100%; padding: 16px 12px 12px; display: block; }
             .sidebar h2 { margin-bottom: 12px; padding-bottom: 12px; font-size: 18px; }
-            .sidebar-link { display: flex; justify-content: center; padding: 10px 12px; margin: 4px 0; font-size: 12px; }
-            .sidebar-logout { display: block; margin-top: 12px; padding: 11px; }
+            .sidebar-link { display: flex; justify-content: center; padding: 10px 12px; margin: 6px 0; font-size: 12px; background: transparent; color: #17466f; box-shadow: none; }
+            .sidebar-link:hover { background: #fff; color: #174ea6; box-shadow: 0 6px 14px rgba(36,104,157,.10); }
+            .sidebar-link.active { color: #174ea6; background: rgba(255,255,255,.36); box-shadow: none; }
+            .sidebar-logout { display: block; margin-top: 12px; padding: 11px; background: transparent; color: #17466f; box-shadow: none; }
+            .sidebar-logout:hover { background: #fff; color: #174ea6; box-shadow: 0 6px 14px rgba(36,104,157,.10); }
             .header { padding: 16px 18px; }
             .header-title { font-size: 16px; }
             .main main { width: calc(100% - 24px); margin-top: 28px; }
@@ -228,9 +239,15 @@ foreach ($selectedLogs as $log) {
             .sidebar {
                 position: fixed; inset: 0 auto 0 0; z-index: 1000;
                 width: min(290px, 86vw); height: 100vh; overflow-y: auto;
+                padding: 72px 20px 20px;
                 transform: translateX(-105%); transition: transform .25s ease;
                 box-shadow: 12px 0 30px rgba(10,18,60,.25);
             }
+            .sidebar h2 { color: #174ea6; border-bottom-color: rgba(23,78,166,.16); }
+            .sidebar .sidebar-link { display: flex; width: 100%; flex: 0 0 auto; margin: 6px 0; justify-content: flex-start; color: #17466f; }
+            .sidebar .sidebar-link:hover { background: rgba(255,255,255,.58); color: #174ea6; transform: none; }
+            .sidebar .sidebar-link.active { color: #174ea6; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,.18); }
+            .sidebar .sidebar-logout { color: #17466f; border-color: rgba(23,78,166,.18); background: rgba(255,255,255,.28); padding: 9px 12px; font-size: 13px; border-radius: 9px; }
             .sidebar.open { transform: translateX(0); }
             .sidebar-backdrop {
                 position: fixed; inset: 0; z-index: 999; background: rgba(10,18,60,.45);
@@ -247,16 +264,18 @@ foreach ($selectedLogs as $log) {
         <aside class="sidebar">
             <h2>CITY AIRSHED MS</h2>
             <?php if ($isAdmin): ?>
-                <a class="sidebar-link" href="admin_dashboard.php">Dashboard</a>
-                <a class="sidebar-link" href="admin_dashboard.php#v-reports">User Reports</a>
-                <a class="sidebar-link" href="admin_dashboard.php#v-users">User Monitoring</a>
-                <a class="sidebar-link" href="admin_dashboard.php#v-net">Device Network</a>
+                <a class="sidebar-link" href="admin_dashboard.php">📊 Dashboard</a>
+                <a class="sidebar-link" href="admin_dashboard.php#v-reports">📢 User Reports</a>
+                <a class="sidebar-link" href="admin_dashboard.php#v-users">👥 User &amp; Admin Management</a>
+                <a class="sidebar-link" href="admin_dashboard.php#v-net">⚙️ Device Network</a>
+                <a class="sidebar-link" href="admin_dashboard.php#v-feedback">⭐ User Feedback</a>
+                <a class="sidebar-link" href="admin_dashboard.php#v-alerts">🔔 Alert History</a>
             <?php else: ?>
-                <a class="sidebar-link" href="user_dashboard.php">Real-time Monitoring</a>
+                <a class="sidebar-link" href="user_dashboard.php">📡 Real-time Monitoring</a>
             <?php endif; ?>
-            <a class="sidebar-link active" href="sensor_reports.php">Sensor Reports</a>
+            <a class="sidebar-link active" href="sensor_reports.php">📈 Sensor Reports</a>
             <?php if (!$isAdmin): ?><p class="sidebar-note">View your air-quality readings and daily sensor history.</p><?php endif; ?>
-            <a class="sidebar-logout" href="logout.php">Sign Out</a>
+            <a class="sidebar-logout" href="logout.php">🚪 Sign Out</a>
         </aside>
 
         <div class="main">

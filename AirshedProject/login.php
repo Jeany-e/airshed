@@ -47,8 +47,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Login | City Airshed MS</title>
     <style>
         :root {
-            --primary: #1a237e;
-            --blue-anim: linear-gradient(-45deg, #1a237e, #311b92, #1e88e5, #3949ab);
+            --primary: #174ea6;
+            --blue-anim: linear-gradient(135deg, #78c5ef, #bce8fa, #4f9bd3);
         }
 
         body {
@@ -60,7 +60,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             align-items: center;
             justify-content: center;
             background: var(--blue-anim);
-            background-size: 400% 400%;
+            background-size: 240% 240%;
             animation: gradientBG 15s ease infinite;
             overflow: hidden;
         }
@@ -81,13 +81,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             text-align: center;
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.5);
-            animation: slideUp 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: authPanelFloat 5.5s ease-in-out infinite;
             position: relative;
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes authPanelFloat {
+            0% { opacity: 0; transform: translateY(40px); }
+            14% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-6px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
         /* NEW: Back Button Styling */
@@ -158,7 +160,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border-color: var(--primary);
             background: #fff;
             outline: none;
-            box-shadow: 0 0 0 5px rgba(26, 35, 126, 0.15);
+            box-shadow: 0 0 0 5px rgba(23, 78, 166, 0.15);
         }
 
         button {
@@ -173,13 +175,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             cursor: pointer;
             transition: all 0.3s ease;
             margin-top: 15px;
-            box-shadow: 0 10px 20px rgba(26, 35, 126, 0.25);
+            box-shadow: 0 10px 20px rgba(23, 78, 166, 0.25);
         }
 
         button:hover {
-            background: #0d145a;
+            background: #123d82;
             transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(26, 35, 126, 0.4);
+            box-shadow: 0 15px 30px rgba(23, 78, 166, 0.4);
         }
 
         .error-msg {

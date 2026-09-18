@@ -32,27 +32,29 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
     <style>
         :root { 
-            --primary: #1a237e; --ai-purple: #673ab7; --accent: #00c853; --bg: #f8f9fc; 
-            --danger: #ef5350; --text: #1c1e21;
-            --blue-anim: linear-gradient(-45deg, #1a237e, #311b92, #1e88e5, #3949ab);
+            --primary: #174ea6; --ai-purple: #2767b5; --accent: #0f9f86; --bg: #e5f4ff; 
+            --danger: #d94b4b; --text: #263b4d;
+            --blue-anim: linear-gradient(135deg, #78c5ef, #bce8fa, #4f9bd3);
         }
 
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); display: flex; height: 100vh; overflow: hidden; color: var(--text); }
+        body { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; background: linear-gradient(120deg, #d5efff, #f8fcff, #c6e9fb); background-size: 300% 300%; animation: pageBlueFlow 11s ease-in-out infinite; display: flex; height: 100vh; overflow: hidden; color: var(--text); }
 
         /* Sidebar */
         .sidebar { 
-            width: 280px; min-width: 280px; background: var(--blue-anim); background-size: 400% 400%;
-            animation: gradientBG 10s ease infinite; color: #fff; padding: 30px 20px; 
-            display: flex; flex-direction: column; box-shadow: 4px 0 10px rgba(0,0,0,0.2); 
+            width: 280px; min-width: 280px; background: linear-gradient(135deg, #78c5ef, #bce8fa, #4f9bd3); background-size: 240% 240%;
+            animation: gradientBG 8s ease-in-out infinite; color: #fff; padding: 30px 20px; 
+            display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(36,104,157,0.18); 
         }
         @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes pageBlueFlow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 
-        .sidebar h2 { font-size: 20px; font-weight: 800; text-align: center; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 20px; }
-        .nav-link { padding: 15px 20px; border-radius: 10px; cursor: pointer; margin: 8px 0; transition: 0.3s; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; font-weight: 600; }
-        .nav-link.active { background: #fff; color: var(--primary); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
-        .logout-btn { margin-top: auto; padding: 18px; text-align: center; background: rgba(255,255,255,0.1); color: #fff; text-decoration: none; border-radius: 15px; font-weight: 800; border: 1px solid rgba(255,255,255,0.2); }
-        .header-signout { display: inline-flex; align-items: center; gap: 6px; padding: 9px 13px; border-radius: 9px; background: #fff1f2; color: #be123c; text-decoration: none; font-size: 12px; font-weight: 800; }
+        .sidebar h2 { font-size: 20px; font-weight: 800; text-align: center; color: #174ea6; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 20px; }
+        .nav-link { padding: 15px 20px; border-radius: 10px; cursor: pointer; margin: 8px 0; transition: all 0.3s ease; display: flex; align-items: center; gap: 12px; color: #17466f; text-decoration: none; font-size: 14px; font-weight: 600; }
+        .nav-link:hover { background: rgba(255,255,255,0.58); color: #174ea6; transform: translateX(8px); }
+        .nav-link.active { background: #fff; color: var(--primary); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .logout-btn { margin-top: 20px; padding: 15px; text-align: center; background: rgba(255,255,255,0.28); color: #17466f; text-decoration: none; border-radius: 10px; font-weight: 800; border: 1px solid rgba(23,78,166,0.18); }
+        .header-signout { display: none; align-items: center; gap: 6px; padding: 9px 13px; border-radius: 9px; background: #fff1f2; color: #be123c; text-decoration: none; font-size: 12px; font-weight: 800; }
         .header-signout:hover { background: #ffe4e6; }
         .feedback-modal { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; padding: 20px; background: rgba(10, 18, 60, 0.55); }
         .feedback-modal.open { display: flex; }
@@ -66,7 +68,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
         /* Main Content Area */
         .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; height: 100vh; }
-        .header { background: #fff; padding: 20px 40px; border-bottom: 1px solid #eef2f7; display: flex; justify-content: space-between; align-items: center; }
+        .header { background: rgba(255,255,255,0.9); padding: 20px 40px; border-bottom: 1px solid #cce5f4; display: flex; justify-content: space-between; align-items: center; }
 
         .scroll-area { padding: 30px; overflow-y: auto; flex: 1; }
         .view-section { display: none; animation: slideUp 0.5s ease; }
@@ -76,39 +78,41 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         /* Dashboard Layout */
         .top-row { display: flex; flex-direction: column; gap: 25px; margin-bottom: 25px; } 
         .metrics-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
-        .card { background: #fff; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #f0f0f0; text-align: center; }
+        .card { background: #fff; padding: 25px; border-radius: 15px; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; border: 1px solid #c9e4f2; border-top: 5px solid var(--primary); text-align: center; position: relative; animation: panelFloat 5.5s ease-in-out infinite; }
         .val { font-size: 38px; font-weight: 800; color: var(--primary); display: block; }
 
         .ai-panel { 
-            flex: 1; background: #fff; border-top: 5px solid var(--ai-purple);
-            padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(103, 58, 183, 0.1); order: -1;
+            flex: 1; background: #fff; border-top: 5px solid var(--primary);
+            padding: 25px; border-radius: 15px; box-shadow: 0 14px 30px rgba(36,104,157,0.16); order: -1; animation: panelFloat 5.5s ease-in-out .4s infinite;
         }
         .range-selector { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
-        .range-button { min-width: 70px; padding: 11px 18px; border-radius: 999px; border: 1px solid transparent; background: #f6f4ff; color: #36364f; font-weight: 700; cursor: pointer; transition: all 0.25s ease; }
-        .range-button.active, .range-button:hover { background: var(--ai-purple); color: #fff; box-shadow: 0 14px 30px rgba(103,58,183,0.16); }
-        .selected-forecast { display: flex; flex-direction: column; justify-content: center; align-items: center; background: #fff; border: 1px solid #e9e7ff; border-radius: 24px; padding: 22px; min-width: 220px; box-shadow: 0 18px 40px rgba(103,58,183,0.06); }
+        .range-button { min-width: 70px; padding: 11px 18px; border-radius: 999px; border: 1px solid #c9e4f2; background: #eef8ff; color: #38566e; font-weight: 700; cursor: pointer; transition: all 0.25s ease; }
+        .range-button.active, .range-button:hover { background: var(--primary); color: #fff; box-shadow: 0 12px 24px rgba(23,78,166,0.18); }
+        .selected-forecast { display: flex; flex: 1 1 100%; width: 100%; min-width: 0; flex-direction: column; justify-content: center; align-items: center; background: #fff; border: 1px solid #c9e4f2; border-radius: 24px; padding: 22px; box-shadow: 0 12px 26px rgba(36,104,157,0.12); animation: panelFloat 5.5s ease-in-out .7s infinite; }
         .selected-forecast label { font-size: 10px; font-weight: 800; color: #7f7f9a; text-transform: uppercase; letter-spacing: 0.12em; }
         .selected-forecast-value { font-size: 32px; font-weight: 900; margin-top: 10px; color: var(--primary); }
         .selected-forecast-note { margin-top: 6px; font-size: 13px; color: #6f708a; }
         .status-badge { font-size: 32px; font-weight: 800; margin: 10px 0; display: block; }
 
-        .advisory-card { background: #fff; padding: 15px; border-radius: 15px; border-left: 8px solid var(--accent); margin-bottom: 20px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .advisory-card { background: #fff; padding: 15px; border-radius: 15px; border: 1px solid #c9e4f2; border-left: 8px solid var(--accent); margin-bottom: 20px; display: flex; align-items: center; gap: 15px; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; animation: panelFloat 5.5s ease-in-out .2s infinite; }
         .advisory-card h4 { margin: 0; color: var(--primary); }
         .advisory-card p { margin: 3px 0 0; font-size: 14px; }
 
         /* History Table */
-        .history-card { background: #fff; padding: 20px; border-radius: 15px; margin-top: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .history-card { background: #fff; padding: 20px; border-radius: 15px; margin-top: 25px; border: 1px solid #c9e4f2; box-shadow: 0 14px 30px rgba(36,104,157,0.14); animation: panelFloat 5.5s ease-in-out .8s infinite; }
         .history-table-wrap { max-height: min(42vh, 360px); overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .chart-scroll { width: 100%; overflow-x: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .chart-track { width: 1200px; height: 260px; }
         .chart-track canvas { display: block; width: 1200px !important; height: 260px !important; max-width: none; }
-        .guide-card { background: #fff; padding: 22px; border-radius: 15px; border: 1px solid #eef0f5; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .guide-card { background: #fff; padding: 22px; border-radius: 18px; border: 1px solid #c9e4f2; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; margin-bottom: 25px; animation: panelFloat 5.5s ease-in-out 1.1s infinite; }
         .guide-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--primary); }
         .guide-card p { margin: 0 0 14px; color: #5f677a; font-size: 14px; }
         .guide-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-        .guide-list li { background: #f7f8ff; color: #3a4065; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+        .guide-list li { background: #eef8ff; color: #38566e; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
         .guide-list strong { color: var(--primary); }
-        .profile-card { max-width: 760px; background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+        @keyframes panelFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+        @media (prefers-reduced-motion: reduce) { body, .card, .ai-panel, .selected-forecast, .advisory-card, .history-card, .guide-card, .profile-card { animation: none; } }
+        .profile-card { max-width: 760px; background: #fff; padding: 30px; border-radius: 15px; border: 1px solid #c9e4f2; box-shadow: 0 14px 30px rgba(36,104,157,.14); animation: panelFloat 5.5s ease-in-out 1.1s infinite; }
         .profile-card h2 { color: var(--primary); margin-top: 0; }
         .profile-note { color: #7f8c8d; font-size: 13px; }
         .profile-field { margin-bottom: 18px; }
@@ -263,6 +267,11 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 overflow-y: auto; transform: translateX(-105%);
                 transition: transform .25s ease; box-shadow: 12px 0 30px rgba(10,18,60,.25);
             }
+            .sidebar h2 { color: #174ea6; border-bottom-color: rgba(23,78,166,.16); }
+            .sidebar .nav-link { display: flex; width: 100%; flex: 0 0 auto; margin: 6px 0; justify-content: flex-start; color: #17466f; }
+            .sidebar .nav-link:hover { background: rgba(255,255,255,.58); color: #174ea6; transform: none; }
+            .sidebar .nav-link.active { color: #174ea6; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,.18); }
+            .sidebar .logout-btn { color: #17466f; border-color: rgba(23,78,166,.18); background: rgba(255,255,255,.28); padding: 9px 12px; font-size: 13px; border-radius: 9px; }
             .sidebar.open { transform: translateX(0); }
             .sidebar-backdrop {
                 position: fixed; inset: 0; z-index: 999; background: rgba(10,18,60,.45);
