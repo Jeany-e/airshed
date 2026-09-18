@@ -515,7 +515,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         }).then(response => response.json()).then(result => {
             statusElement.textContent = result.success ? 'Thank you for your feedback.' : (result.error || 'Unable to save feedback.');
             if (result.success && closeModal) {
-                setTimeout(() => document.getElementById('feedbackModal').classList.remove('open'), 700);
+                document.getElementById('feedbackModal').classList.remove('open');
             }
             if (!result.success) {
                 document.querySelectorAll(starSelector).forEach(star => star.classList.remove('selected'));
