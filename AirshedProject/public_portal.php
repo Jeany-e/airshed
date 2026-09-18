@@ -210,7 +210,7 @@ include "config.php";
 
             .navbar {
                 flex-direction: column;
-                align-items: stretch;
+                align-items: center;
                 padding: 0.55rem 12px 0.7rem;
                 gap: 7px;
             }
@@ -227,7 +227,6 @@ include "config.php";
                 width: 100%;
                 max-width: 320px;
                 gap: 6px;
-                align-self: center;
             }
 
             .btn-link,
@@ -376,7 +375,7 @@ include "config.php";
 
             .nav-actions {
                 grid-template-columns: 1fr;
-                justify-items: end;
+                max-width: 240px;
             }
 
             .btn-report {
