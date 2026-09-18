@@ -6,13 +6,13 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 
 try {
     $records = array_values(array_filter(firebaseRows('sensor_logs'), function ($record) {
-        return ($record['source'] ?? '') === 'device';
+        return ($record['source'] ?? '') === 'device'
+            && (isset($record['pm25']) || isset($record['pm2_5']) || isset($record['pm2.5']));
     }));
-    if (!$records) {
-        $records = array_values(array_filter(firebaseRows('sensor_data'), function ($record) {
-            return ($record['source'] ?? '') === 'device';
-        }));
+    foreach ($records as &$record) {
+        $record['pm25'] = $record['pm25'] ?? $record['pm2_5'] ?? $record['pm2.5'];
     }
+    unset($record);
     usort($records, function ($a, $b) {
         return strcmp($a['timestamp'] ?? '', $b['timestamp'] ?? '');
     });
