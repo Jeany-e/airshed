@@ -145,15 +145,24 @@ include "config.php";
 
         @media (max-width: 900px) {
             .navbar {
+                flex-direction: column;
+                align-items: center;
                 flex-wrap: wrap;
                 gap: 10px;
                 padding: 1rem 5%;
             }
 
             .nav-actions {
-                justify-content: flex-end;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 width: 100%;
+                max-width: 520px;
+                gap: 8px;
+                margin: 0 auto;
+                align-self: center;
             }
+
+            .nav-actions .btn-report { grid-column: 1 / -1; }
 
             .ai-card {
                 flex-direction: column;
@@ -225,7 +234,7 @@ include "config.php";
                 display: grid;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
                 width: 100%;
-                max-width: 320px;
+                max-width: none;
                 gap: 6px;
             }
 
@@ -374,12 +383,12 @@ include "config.php";
             }
 
             .nav-actions {
-                grid-template-columns: 1fr;
-                max-width: 240px;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                max-width: none;
             }
 
             .btn-report {
-                grid-column: auto;
+                grid-column: 1 / -1;
             }
 
             .status-display {
