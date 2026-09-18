@@ -153,8 +153,20 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 font-size: 11px;
             }
             .ai-insight { font-size: 15px; line-height: 1.45; min-height: 0; }
-            .history-table-wrap { max-height: 48vh; overflow: auto; }
-            .history-card table { min-width: 540px; }
+            .history-table-wrap { max-height: 48vh; overflow-x: hidden; overflow-y: auto; }
+            .history-card table {
+                min-width: 0;
+                width: 100%;
+                table-layout: fixed;
+            }
+            .history-card th,
+            .history-card td {
+                padding: 9px 4px;
+                font-size: 10px;
+                line-height: 1.35;
+                overflow-wrap: anywhere;
+                vertical-align: middle;
+            }
             .history-card th { position: sticky; top: 0; z-index: 1; background: #fff; }
         }
 
@@ -259,13 +271,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 -webkit-overflow-scrolling: touch;
             }
 
-            .history-card table {
-                min-width: 490px;
-            }
-
-            .history-table-wrap table {
-                min-width: 620px;
-            }
+            .history-card table { min-width: 0; }
 
             th,
             td {
