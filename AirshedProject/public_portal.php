@@ -104,18 +104,21 @@ include "config.php";
         .forecast-summary > div { min-width: 0; min-height: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff !important; box-shadow: 0 8px 18px rgba(45,112,164,0.08); transition: transform 0.25s ease, box-shadow 0.25s ease; }
         .pred-box,
         .forecast-summary > div,
+        .guide-card,
         .card { animation: cardRise 0.6s ease both, cardFloat 5.5s ease-in-out 0.7s infinite; }
         .pred-box:hover,
         .forecast-summary > div:hover,
+        .guide-card:hover,
         .card:hover { transform: translateY(-7px) scale(1.01); box-shadow: 0 18px 30px rgba(45,112,164,0.22); }
         .pred-box:nth-child(2), .forecast-summary > div:nth-child(2), .card:nth-child(2) { animation-delay: 0.08s; }
         .card:nth-child(3) { animation-delay: 0.16s; }
         .card:nth-child(4) { animation-delay: 0.24s; }
         @keyframes cardRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes guidePop { from { opacity: 0; scale: .94; } to { opacity: 1; scale: 1; } }
         @keyframes cardFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
         @keyframes surfaceFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
         @media (prefers-reduced-motion: reduce) {
-            .ai-card, .pred-box, .forecast-summary > div, .card, .section-box { animation: none; }
+            .ai-card, .pred-box, .forecast-summary > div, .guide-card, .card, .section-box { animation: none; }
         }
         .ai-right > h4 { text-align: left; margin-top: 4px !important; font-size: 15px !important; letter-spacing: 0.04em; color: #3f596c !important; }
         .ai-insight { text-align: left; background: #eef7fd; border: 1px solid #d7eaf5; border-radius: 12px; padding: 12px 14px; color: #294762 !important; font-size: 15px !important; line-height: 1.45 !important; }
@@ -133,7 +136,7 @@ include "config.php";
         /* Layout split */
         .content-split { display: grid; grid-template-columns: 1.35fr 1fr; gap: 24px; align-items: stretch; }
         .section-box { background: #fff; padding: 40px; border-radius: 35px; border: 1px solid #c3e0f1; box-shadow: 0 18px 36px rgba(47,112,163,0.18), 0 3px 0 rgba(255,255,255,0.9) inset; animation: surfaceFloat 7s ease-in-out 0.8s infinite; }
-        .guide-card { background: #fff; padding: 22px; border-radius: 18px; border: 1px solid #c3e0f1; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; margin-bottom: 24px; animation: surfaceFloat 7s ease-in-out 1.1s infinite; }
+        .guide-card { background: #fff; padding: 22px; border-radius: 18px; border: 1px solid #c3e0f1; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; margin-bottom: 24px; animation: guidePop 0.75s cubic-bezier(.2,.8,.2,1) both, cardFloat 5.5s ease-in-out 1.1s infinite; }
         .guide-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--primary); }
         .guide-card p { margin: 0 0 14px; color: #5f677a; font-size: 14px; }
         .guide-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
