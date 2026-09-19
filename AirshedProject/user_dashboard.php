@@ -106,6 +106,11 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         .chart-scroll { width: 100%; overflow-x: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .chart-track { width: 1200px; height: 260px; }
         .chart-track canvas { display: block; width: 1200px !important; height: 260px !important; max-width: none; }
+        .chart-card { background: #fff; padding: 24px 28px 28px; border-radius: 30px; }
+        .chart-heading { margin: 0 0 14px; color: var(--primary); font-size: 18px; font-weight: 800; }
+        .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 12px; color: #5f677a; font-size: 12px; font-weight: 700; }
+        .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+        .chart-legend-line { width: 22px; height: 3px; border-radius: 3px; }
         .guide-card { background: #fff; padding: 22px; border-radius: 18px; border: 1px solid #c9e4f2; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; margin-bottom: 25px; animation: panelFloat 5.5s ease-in-out 1.1s infinite; }
         .guide-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--primary); }
         .guide-card p { margin: 0 0 14px; color: #5f677a; font-size: 14px; }
@@ -381,8 +386,9 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                             <button class="range-button" onclick="setPredictionRange(720,this)">12h</button>
                         </div>
                         <div class="selected-forecast">
-                            <label>Selected Forecast</label>
+                            <label>Selected PM2.5 Forecast</label>
                             <div id="selectedForecast" class="selected-forecast-value">--</div>
+                            <div style="font-size:12px; font-weight:700; color:#7f7f9a;">µg/m³</div>
                             <div id="selectedForecastLabel" class="selected-forecast-note">Next 5 minutes</div>
                         </div>
                     </div>
@@ -398,12 +404,14 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                     </div>
                     <div style="display:flex; gap:10px; margin-top:12px;">
                         <div style="flex:1; background:#f0f0ff; padding:15px; border-radius:15px; text-align:center;">
-                            <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">NEXT 5 MINS</label>
+                            <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">PM2.5 · NEXT 5 MINS</label>
                             <div id="predict30" style="font-size:24px; font-weight:900;">--</div>
+                            <div style="font-size:11px; font-weight:700; color:#7f7f9a;">µg/m³</div>
                         </div>
                         <div style="flex:1; background:var(--ai-purple); color:#fff; padding:15px; border-radius:15px; text-align:center;">
-                            <label style="font-size:10px; font-weight:800; opacity:0.8;">NEXT 15 MINS</label>
+                            <label style="font-size:10px; font-weight:800; opacity:0.8;">PM2.5 · NEXT 15 MINS</label>
                             <div id="predict2h" style="font-size:24px; font-weight:900;">--</div>
+                            <div style="font-size:11px; font-weight:700; opacity:0.8;">µg/m³</div>
                         </div>
                     </div>
                 </div>
@@ -421,7 +429,16 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 </ul>
             </div>
 
-            <div style="background:#fff; padding:35px; border-radius:30px;"><div class="chart-scroll"><div class="chart-track"><canvas id="pollutantChart" width="1200" height="260"></canvas></div></div></div>
+            <div class="chart-card">
+                <h3 class="chart-heading">SENSOR TREND HISTORY</h3>
+                <div class="chart-legend" aria-label="Sensor chart legend">
+                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#673ab7;"></span>PM2.5 (µg/m³)</span>
+                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#ff7043;"></span>Temperature (°C)</span>
+                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#00a896;"></span>Humidity (%)</span>
+                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#8e44ad;"></span>CO Gas (ppm)</span>
+                </div>
+                <div class="chart-scroll"><div class="chart-track"><canvas id="pollutantChart" width="1200" height="260"></canvas></div></div>
+            </div>
             
             <div class="history-card">
                 <h3 style="margin:0; font-weight:800; color:var(--primary);">🕒 Recent Readings</h3>
