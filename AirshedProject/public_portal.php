@@ -133,6 +133,12 @@ include "config.php";
         /* Layout split */
         .content-split { display: grid; grid-template-columns: 1.35fr 1fr; gap: 24px; align-items: stretch; }
         .section-box { background: #fff; padding: 40px; border-radius: 35px; border: 1px solid #c3e0f1; box-shadow: 0 18px 36px rgba(47,112,163,0.18), 0 3px 0 rgba(255,255,255,0.9) inset; animation: surfaceFloat 7s ease-in-out 0.8s infinite; }
+        .guide-card { background: #fff; padding: 22px; border-radius: 18px; border: 1px solid #c3e0f1; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; margin-bottom: 24px; animation: surfaceFloat 7s ease-in-out 1.1s infinite; }
+        .guide-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--primary); }
+        .guide-card p { margin: 0 0 14px; color: #5f677a; font-size: 14px; }
+        .guide-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+        .guide-list li { background: #eef8ff; color: #38566e; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+        .guide-list strong { color: var(--primary); }
         .table-scroll { max-width: 100%; max-height: min(55vh, 500px); overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .sensor-log-box { align-self: start; padding: 26px; min-width: 0; height: max-content; }
         .sensor-log-box .table-scroll { max-height: 360px; min-height: 0; overflow-x: auto; overflow-y: auto; }
@@ -322,6 +328,7 @@ include "config.php";
             }
 
             .card,
+            .guide-card,
             .section-box,
             .sensor-log-box {
                 border-radius: 18px;
@@ -479,6 +486,18 @@ include "config.php";
         <div class="card" style="border-top-color: #0f9f86;"><label>CO Gas</label><span class="val" id="co">--</span><span class="unit">ppm</span></div>
     </div>
 
+    <div class="guide-card">
+        <h3>How to Read Your Airshed Dashboard</h3>
+        <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
+        <ul class="guide-list">
+            <li><strong>PM2.5</strong>: Tiny particles in the air from smoke, dust, and combustion. This is the main air-quality indicator: 0-12 = Good, 12-35 = Moderate, 35+ = Poor.</li>
+            <li><strong>CO Gas</strong>: Carbon monoxide from burning fuel and combustion. It helps detect smoke or poor ventilation; target below 9 ppm.</li>
+            <li><strong>Temperature</strong>: How hot or cool the air is, used to understand comfort and weather conditions. The ideal range is 20-28°C.</li>
+            <li><strong>Humidity</strong>: The amount of moisture in the air, used to understand how dry or heavy the air feels. 30-60% is optimal.</li>
+            <li><strong>System status</strong>: Shows whether the sensor is sending data. Online means connected; Offline means the portal cannot reach the sensor node.</li>
+        </ul>
+    </div>
+
     <div class="content-split">
         <div class="section-box sensor-log-box">
             <h3 style="font-size: 22px; font-weight: 800; margin-bottom: 25px; color: var(--primary);">LIVE TREND: PM2.5 & TEMPERATURE</h3>
@@ -492,7 +511,9 @@ include "config.php";
                     <tr>
                         <th>Time</th>
                         <th>Temp</th>
+                        <th>Humidity</th>
                         <th>PM2.5</th>
+                        <th>CO Gas</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -522,6 +543,28 @@ function getWeatherOutlook(temp, hum) {
     if (temp >= 28) return "Warm";
     if (temp <= 20) return "Cool";
     return "Pleasant";
+}
+
+function clampForecast(value, min, max) {
+    return value === null ? null : Math.min(max, Math.max(min, Number(value)));
+}
+
+function renderHistoryRows(history) {
+    const historyBody = document.getElementById('historyBody');
+    historyBody.innerHTML = '';
+    history.slice().reverse().slice(0, 10).forEach(reading => {
+        const pm25 = Number(reading.pm25);
+        const temp = Number(reading.temp);
+        if (!Number.isFinite(pm25) || !Number.isFinite(temp) || temp <= 0 || temp > 60 || pm25 < 0) return;
+        const status = pm25 > 35 ? 'POOR' : (pm25 > 12 ? 'MODERATE' : 'GOOD');
+        const statusColor = status === 'POOR' ? '#c43d4b' : (status === 'MODERATE' ? '#b87512' : '#168a68');
+        const readingTime = reading.timestamp ? new Date(reading.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent';
+        const humidity = Number(reading.hum);
+        const co = Number(reading.co);
+        const humidityText = Number.isFinite(humidity) ? `${humidity.toFixed(1)}%` : '--';
+        const coText = Number.isFinite(co) ? co.toFixed(1) : '--';
+        historyBody.insertAdjacentHTML('beforeend', `<tr><td><b>${readingTime}</b></td><td style="color:#b87512">${temp.toFixed(1)}°C</td><td>${humidityText}</td><td>${pm25.toFixed(1)}</td><td>${coText}</td><td style="color:${statusColor}; font-weight:900;">${status}</td></tr>`);
+    });
 }
 
 // Dual-Axis Chart
@@ -568,8 +611,35 @@ function fetchData() {
             document.getElementById('co').innerText = '--';
             document.getElementById('statusText').innerText = 'NO LIVE DATA';
             document.getElementById('statusText').style.color = '#a9404a';
-            document.getElementById('humForecast').innerText = '--';
-            document.getElementById('weatherForecast').innerText = 'Waiting for live sensor data...';
+                const recentHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
+            renderHistoryRows(recentHistory);
+                const recentPmHistory = recentHistory
+                    .map(reading => Number(reading.pm25))
+                    .filter(Number.isFinite);
+                const recentTempHistory = recentHistory
+                    .map(reading => Number(reading.temp))
+                    .filter(Number.isFinite)
+                    .filter(value => value > 0);
+                const recentHumHistory = recentHistory
+                    .map(reading => Number(reading.hum))
+                    .filter(Number.isFinite)
+                    .filter(value => value > 0);
+                const recentP30 = getPrediction(recentPmHistory, 600);
+                const recentP2h = getPrediction(recentPmHistory, 2400);
+                const recentForecastTemp = getPrediction(recentTempHistory, 600);
+                const recentForecastHum = getPrediction(recentHumHistory, 600);
+                const recentTempValue = clampForecast(recentForecastTemp, 0, 60);
+                const recentHumValue = clampForecast(recentForecastHum, 0, 100);
+
+                document.getElementById('forecast30').innerText = recentP30 || '---';
+                document.getElementById('forecastVal').innerText = recentP2h || '---';
+                document.getElementById('humForecast').innerText = recentHumValue !== null ? `${recentHumValue.toFixed(1)}%` : '--';
+                document.getElementById('weatherForecast').innerText = recentTempValue !== null
+                    ? `${getWeatherOutlook(recentTempValue, recentHumValue)} · ${recentTempValue.toFixed(1)}°C`
+                    : 'Waiting for live sensor data...';
+                document.getElementById('aiInsight').innerHTML = recentP2h
+                    ? 'Forecast based on the latest available sensor readings. Live sensor data is currently offline.'
+                    : 'Waiting for enough sensor readings to calculate a forecast.';
             return;
         }
 
@@ -577,9 +647,12 @@ function fetchData() {
         const currentHum = parseFloat(d.hum);
         if (!historyInitialized && Array.isArray(d.prediction_history)) {
             d.prediction_history.forEach(reading => {
-                if (Number.isFinite(Number(reading.temp))) tempHistory.push(Number(reading.temp));
-                if (Number.isFinite(Number(reading.hum))) humHistory.push(Number(reading.hum));
-                if (Number.isFinite(Number(reading.pm25))) chart.data.datasets[0].data.push(Number(reading.pm25));
+                const historyTemp = Number(reading.temp);
+                const historyHum = Number(reading.hum);
+                const historyPm25 = Number(reading.pm25);
+                if (Number.isFinite(historyTemp) && historyTemp > 0 && historyTemp <= 60) tempHistory.push(historyTemp);
+                if (Number.isFinite(historyHum) && historyHum >= 0 && historyHum <= 100) humHistory.push(historyHum);
+                if (Number.isFinite(historyPm25) && historyPm25 >= 0) chart.data.datasets[0].data.push(historyPm25);
             });
             historyInitialized = true;
         }
@@ -590,14 +663,16 @@ function fetchData() {
 
         const forecastTemp = tempHistory.length >= 5 ? getPrediction(tempHistory, 600) : null;
         const forecastHum = humHistory.length >= 5 ? getPrediction(humHistory, 600) : null;
+        const forecastTempValue = clampForecast(forecastTemp, 0, 60);
+        const forecastHumValue = clampForecast(forecastHum, 0, 100);
         const outlook = getWeatherOutlook(currentTemp, currentHum);
 
         document.getElementById('temp').innerText = d.temp;
         document.getElementById('hum').innerText = d.hum;
         document.getElementById('pm25').innerText = d.pm25;
         document.getElementById('co').innerText = d.co;
-        document.getElementById('humForecast').innerText = forecastHum !== null ? `${Number(forecastHum).toFixed(1)}%` : '--';
-        document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTemp !== null ? `${Number(forecastTemp).toFixed(1)}°C` : '...'}`;
+        document.getElementById('humForecast').innerText = forecastHumValue !== null ? `${forecastHumValue.toFixed(1)}%` : '--';
+        document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTempValue !== null ? `${forecastTempValue.toFixed(1)}°C` : '...'}`;
 
         let status = d.pm25 > 35 ? "POOR" : (d.pm25 > 12 ? "MODERATE" : "GOOD");
         let tColor = d.pm25 > 35 ? "#c43d4b" : (d.pm25 > 12 ? "#b87512" : "#168a68");
@@ -620,7 +695,7 @@ function fetchData() {
             else if(f2 > d.pm25 + 2) advice = "😷 <b>Warning:</b> Air is deteriorating. Close windows later.";
             else if(f2 < d.pm25 - 2) advice = "✅ <b>Good:</b> Air is clearing up. Safe for outdoor tasks soon.";
             else advice = "📊 <b>Stable:</b> Conditions are consistent. Stay safe!";
-            document.getElementById('aiInsight').innerHTML = `<b>Trend:</b> ${trend}<br>${advice}<br><b>Weather:</b> ${outlook} with humidity forecast at ${forecastHum !== null ? `${Number(forecastHum).toFixed(1)}%` : '--'}.`;
+            document.getElementById('aiInsight').innerHTML = `<b>Trend:</b> ${trend}<br>${advice}<br><b>Weather:</b> ${outlook} with humidity forecast at ${forecastHumValue !== null ? `${forecastHumValue.toFixed(1)}%` : '--'}.`;
         }
 
         let now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -635,7 +710,7 @@ function fetchData() {
         }
         chart.update('none');
 
-        let row = `<tr><td><b>${now}</b></td><td style="color:#b87512">${d.temp}°C</td><td>${d.pm25}</td><td style="color:${tColor}; font-weight:900;">${status}</td></tr>`;
+        let row = `<tr><td><b>${now}</b></td><td style="color:#b87512">${d.temp}°C</td><td>${d.hum}%</td><td>${d.pm25}</td><td>${d.co}</td><td style="color:${tColor}; font-weight:900;">${status}</td></tr>`;
         document.getElementById('historyBody').insertAdjacentHTML("afterbegin", row);
         if(document.getElementById('historyBody').rows.length > 10) {
             document.getElementById('historyBody').deleteRow(10);
