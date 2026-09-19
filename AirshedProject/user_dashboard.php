@@ -94,6 +94,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         .selected-forecast label { font-size: 10px; font-weight: 800; color: #7f7f9a; text-transform: uppercase; letter-spacing: 0.12em; }
         .selected-forecast-value { font-size: 32px; font-weight: 900; margin-top: 10px; color: var(--primary); }
         .selected-forecast-note { margin-top: 6px; font-size: 13px; color: #6f708a; }
+        .forecast-disclaimer { margin: 12px 0 0; color: #7f7f9a; font-size: 11px; line-height: 1.4; text-align: center; }
         .status-badge { font-size: 32px; font-weight: 800; margin: 10px 0; display: block; }
 
         .advisory-card { background: #fff; padding: 15px; border-radius: 15px; border: 1px solid #c9e4f2; border-left: 8px solid var(--accent); margin-bottom: 20px; display: flex; align-items: center; gap: 15px; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; animation: panelFloat 5.5s ease-in-out .2s infinite; }
@@ -414,6 +415,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                             <div style="font-size:11px; font-weight:700; opacity:0.8;">µg/m³</div>
                         </div>
                     </div>
+                    <p class="forecast-disclaimer">Forecast values are estimates based on recent device readings and may change as new data arrives.</p>
                 </div>
             </div>
 

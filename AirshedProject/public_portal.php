@@ -95,6 +95,7 @@ include "config.php";
         .ai-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
         .ai-heading .ai-icon { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 11px; background: var(--primary); color: #fff; font-size: 13px; font-weight: 900; letter-spacing: 0.04em; }
         .ai-heading h3 { margin: 0; color: var(--primary); font-size: 22px; font-weight: 900; }
+        .forecast-disclaimer { margin: 0 0 12px; color: #718797; font-size: 11px; line-height: 1.4; }
         .prediction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
         .pred-box { background: #fff; padding: 20px 14px; border-radius: 16px; text-align: center; border: 1px solid #dbeaf6; }
         .pred-box.emphasis { border: 1px solid var(--primary); background: #fff; }
@@ -450,6 +451,7 @@ include "config.php";
                 <span class="ai-icon" aria-hidden="true">AI</span>
                 <h3>AI ANALYTICS</h3>
             </div>
+            <p class="forecast-disclaimer">Forecast values are estimates based on recent device readings and may change as new data arrives.</p>
             <div class="prediction-grid">
                 <div class="pred-box">
                     <span class="pred-label">Next 30 Minutes</span>
@@ -600,7 +602,11 @@ function getPrediction(history, steps) {
     let sumXX = x.reduce((a,b) => a + (b*b), 0);
     let slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
     let intercept = (sumY - slope * sumX) / n;
-    return Math.max(0, (slope * (n + steps) + intercept)).toFixed(1);
+    let projected = Math.max(0, slope * (n + steps) + intercept);
+    let observedMax = Math.max(...history);
+    let observedMin = Math.min(...history);
+    let reasonableCeiling = observedMax + Math.max(10, (observedMax - observedMin) * 2);
+    return Math.min(projected, reasonableCeiling).toFixed(1);
 }
 
 function fetchData() {
