@@ -98,12 +98,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.5);
             margin: 40px 20px;
-            animation: authPanelEntrance 0.65s ease-out both;
+            animation: authPanelFloat 5.5s ease-in-out infinite;
         }
 
-        @keyframes authPanelEntrance {
-            from { opacity: 0; transform: translateY(24px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes authPanelFloat {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-6px); }
         }
 
         /* Back Button Styling */
