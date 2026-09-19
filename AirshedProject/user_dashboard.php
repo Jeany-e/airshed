@@ -421,13 +421,13 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
             <div class="guide-card">
                 <h3>How to Read Your Airshed Dashboard</h3>
-                <p>These guidelines clarify what each measurement means and what action to take.</p>
+                <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
                 <ul class="guide-list">
-                    <li><strong>PM2.5</strong>: 0-12 = Good, 12-35 = Moderate, 35+ = Poor. High values mean unhealthy air.</li>
-                    <li><strong>CO Gas</strong>: Target below 9 ppm. Elevated CO indicates combustion or poor ventilation.</li>
-                    <li><strong>Temperature</strong>: Ideal comfort range is 20-28°C. Extreme heat can reduce air quality perception.</li>
-                    <li><strong>Humidity</strong>: 30-60% is optimal. Below 30% feels dry; above 60% feels heavy.</li>
-                    <li><strong>System status</strong>: Online means the device is connected; Offline means the dashboard cannot reach the sensor node.</li>
+                    <li><strong>PM2.5</strong>: Tiny particles from smoke, dust, and combustion. It is the main air-quality indicator: 0-12 = Good, 12-35 = Moderate, 35+ = Poor.</li>
+                    <li><strong>CO Gas</strong>: Carbon monoxide from burning fuel and combustion. It helps detect smoke or poor ventilation; target below 9 ppm.</li>
+                    <li><strong>Temperature</strong>: Shows how hot or cool the air is and helps explain comfort and weather conditions. The ideal range is 20-28°C.</li>
+                    <li><strong>Humidity</strong>: Shows the moisture in the air and how dry or heavy it feels. 30-60% is optimal.</li>
+                    <li><strong>System status</strong>: Online means the sensor is connected; Offline means the dashboard cannot reach the sensor node.</li>
                 </ul>
             </div>
 

@@ -5,11 +5,31 @@ date_default_timezone_set('Asia/Manila');
 $isAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 $logs = [];
 $error = '';
+$reportsCacheKey = 'sensor_reports_logs_cache';
+$reportsCacheTtl = 30;
 
-try {
-    $logs = firebaseRows('sensor_logs');
-} catch (Throwable $exception) {
-    $error = 'Sensor history is temporarily unavailable.';
+if (isset($_SESSION[$reportsCacheKey]['logs'], $_SESSION[$reportsCacheKey]['created_at'])
+    && time() - $_SESSION[$reportsCacheKey]['created_at'] < $reportsCacheTtl) {
+    $logs = $_SESSION[$reportsCacheKey]['logs'];
+} else {
+    try {
+        $logs = firebaseRows('sensor_logs');
+        $_SESSION[$reportsCacheKey] = [
+            'logs' => $logs,
+            'created_at' => time()
+        ];
+    } catch (Throwable $exception) {
+        usleep(150000);
+        try {
+            $logs = firebaseRows('sensor_logs');
+            $_SESSION[$reportsCacheKey] = [
+                'logs' => $logs,
+                'created_at' => time()
+            ];
+        } catch (Throwable $retryException) {
+            $error = 'Sensor history is temporarily unavailable.';
+        }
+    }
 }
 
 usort($logs, function ($a, $b) {
@@ -112,7 +132,8 @@ foreach ($selectedLogs as $log) {
         .metric:nth-child(4) { animation-delay: .24s; }
         @keyframes cardRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes cardFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
-        @media (prefers-reduced-motion: reduce) { .metric, .panel { animation: none; } }
+        @keyframes tableFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+        @media (prefers-reduced-motion: reduce) { .metric, .panel, .record-files .table-wrap { animation: none; } }
         .metric-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
         .metric-value { display: block; color: var(--blue); font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; margin-top: 9px; }
         .panel { overflow: hidden; }
@@ -122,6 +143,13 @@ foreach ($selectedLogs as $log) {
         .panel-actions { display: flex; align-items: center; gap: 10px; }
         .export-btn { border: 0; border-radius: 8px; padding: 9px 13px; background: var(--blue); color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
         .export-btn:hover { opacity: .88; }
+        .record-files { margin-top: 24px; margin-bottom: 24px; }
+        .record-files .panel-head { flex-wrap: wrap; }
+        .record-files .date-form { width: 100%; border: 0; border-radius: 0; border-top: 1px solid var(--line); padding: 16px 22px; }
+        .record-files .table-wrap { max-height: 260px; overflow-y: auto; animation: tableFloat 7s ease-in-out 1s infinite; }
+        .record-files table { min-width: 0; }
+        .view-date { display: inline-block; padding: 7px 11px; border-radius: 8px; background: var(--blue-soft); color: var(--blue); text-decoration: none; font-size: 12px; font-weight: 700; }
+        .view-date:hover { background: #dbeaff; }
         .chart-panel { padding: 22px; margin-bottom: 24px; }
         .chart-scroll { width: 100%; overflow-x: auto; overscroll-behavior: contain; }
         .chart-wrap { height: 300px; min-width: 1200px; }
@@ -327,24 +355,6 @@ foreach ($selectedLogs as $log) {
             <div>
                 <h1>Sensor Reports</h1>
             </div>
-            <form class="date-form" method="get">
-                <label for="day">Report date</label>
-                <select id="day" name="day" onchange="this.form.submit()">
-                    <?php if (!$days): ?><option value="<?php echo htmlspecialchars($selectedDay); ?>">No readings yet</option><?php endif; ?>
-                    <?php foreach (array_keys($days) as $day): ?>
-                        <option value="<?php echo htmlspecialchars($day); ?>" <?php echo $day === $selectedDay ? 'selected' : ''; ?>>
-                            <?php echo date('M d, Y', strtotime($day)); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <label for="from">From</label>
-                <input id="from" name="from" type="datetime-local" value="<?php echo htmlspecialchars($fromInput); ?>" aria-label="Starting date and time">
-                <label for="to">To</label>
-                <input id="to" name="to" type="datetime-local" value="<?php echo htmlspecialchars($toInput); ?>" aria-label="Ending date and time">
-                <input name="search" type="search" placeholder="Search time or value" value="<?php echo htmlspecialchars($searchTerm); ?>" aria-label="Search sensor records">
-                <button class="search-btn" type="submit">Search</button>
-                <?php if ($searchTerm || $fromInput || $toInput): ?><a class="clear-search" href="sensor_reports.php?day=<?php echo urlencode($selectedDay); ?>">Clear</a><?php endif; ?>
-            </form>
         </section>
 
         <?php if ($error): ?>
@@ -396,6 +406,51 @@ foreach ($selectedLogs as $log) {
                         </table>
                     </div>
                 <?php endif; ?>
+            </section>
+
+            <section class="panel record-files">
+                <div class="panel-head">
+                    <div>
+                        <h2>Record Files</h2>
+                        <span>Choose a date to load its sensor records above.</span>
+                    </div>
+                </div>
+                <form class="date-form" method="get">
+                    <label for="day">Report date</label>
+                    <select id="day" name="day" onchange="this.form.submit()">
+                        <?php if (!$days): ?><option value="<?php echo htmlspecialchars($selectedDay); ?>">No readings yet</option><?php endif; ?>
+                        <?php foreach (array_keys($days) as $day): ?>
+                            <option value="<?php echo htmlspecialchars($day); ?>" <?php echo $day === $selectedDay ? 'selected' : ''; ?>>
+                                <?php echo date('M d, Y', strtotime($day)); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label for="from">From</label>
+                    <input id="from" name="from" type="datetime-local" value="<?php echo htmlspecialchars($fromInput); ?>" aria-label="Starting date and time">
+                    <label for="to">To</label>
+                    <input id="to" name="to" type="datetime-local" value="<?php echo htmlspecialchars($toInput); ?>" aria-label="Ending date and time">
+                    <input name="search" type="search" placeholder="Search time or value" value="<?php echo htmlspecialchars($searchTerm); ?>" aria-label="Search sensor records">
+                    <button class="search-btn" type="submit">Search</button>
+                    <?php if ($searchTerm || $fromInput || $toInput): ?><a class="clear-search" href="sensor_reports.php?day=<?php echo urlencode($selectedDay); ?>">Clear</a><?php endif; ?>
+                </form>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Date</th><th>Readings</th><th>Action</th></tr></thead>
+                        <tbody>
+                        <?php if (!$days): ?>
+                            <tr><td colspan="3">No record files available.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($days as $day => $dayLogs): ?>
+                                <tr>
+                                    <td><?php echo date('l, F j, Y', strtotime($day)); ?></td>
+                                    <td><?php echo count($dayLogs); ?></td>
+                                    <td><a class="view-date" href="sensor_reports.php?day=<?php echo urlencode($day); ?>">View records</a></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </section>
         <?php endif; ?>
     </main>
