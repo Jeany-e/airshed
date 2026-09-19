@@ -5,13 +5,26 @@ $message = "";
 $messageClass = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = $_POST['username'];
-    $email = $_POST['email'];
-    $phone = $_POST['phone'];
+    $username = trim($_POST['username'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $plainPassword = $_POST['password'] ?? '';
+
+    if ($username === '' || $email === '' || $phone === '' || trim($plainPassword) === '') {
+        $message = "Please complete all required fields.";
+        $messageClass = "error-msg";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $message = "Please enter a valid email address.";
+        $messageClass = "error-msg";
+    }
+
+    if ($message !== '') {
+        // Keep the form visible so the user can correct the missing or invalid data.
+    } else {
     // Public registration can never create an administrator account.
     $role = 'user';
     // Standard SHA256 hashing to match your login logic.
-    $password = hash("sha256", $_POST['password']);
+    $password = hash("sha256", $plainPassword);
 
     // Check if username or email already exists
     $users = firebaseRows('users');
@@ -40,6 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $message = "Registration failed. Please try again.";
             $messageClass = "error-msg";
         }
+    }
     }
 }
 ?>
@@ -84,14 +98,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.5);
             margin: 40px 20px;
-            animation: authPanelFloat 5.5s ease-in-out infinite;
+            animation: authPanelEntrance 0.65s ease-out both;
         }
 
-        @keyframes authPanelFloat {
-            0% { opacity: 0; transform: translateY(40px); }
-            14% { opacity: 1; transform: translateY(0); }
-            50% { opacity: 1; transform: translateY(-6px); }
-            100% { opacity: 1; transform: translateY(0); }
+        @keyframes authPanelEntrance {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Back Button Styling */
