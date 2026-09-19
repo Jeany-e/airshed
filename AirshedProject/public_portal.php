@@ -495,10 +495,10 @@ include "config.php";
         <h3>How to Read Your Airshed Dashboard</h3>
         <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
         <ul class="guide-list">
-            <li><strong>PM2.5</strong>: Tiny particles in the air from smoke, dust, and combustion. This is the main air-quality indicator: 0-12 = Good, 12-35 = Moderate, 35+ = Poor.</li>
-            <li><strong>CO Gas</strong>: Carbon monoxide from burning fuel and combustion. It helps detect smoke or poor ventilation; target below 9 ppm.</li>
-            <li><strong>Temperature</strong>: How hot or cool the air is, used to understand comfort and weather conditions. The ideal range is 20-28°C.</li>
-            <li><strong>Humidity</strong>: The amount of moisture in the air, used to understand how dry or heavy the air feels. 30-60% is optimal.</li>
+            <li><strong>PM2.5</strong>: Tiny particles from smoke, dust, and combustion. 0-12 µg/m³ = Good; 12-35 = Moderate, so reduce prolonged outdoor exposure; above 35 = Poor, so limit outdoor activity and consider a mask.</li>
+            <li><strong>CO Gas</strong>: Carbon monoxide from fuel burning. Below 9 ppm is the safer/low range; 9-35 ppm is elevated, so improve ventilation and check combustion sources; above 35 ppm is dangerous, so leave the area and seek help. This is a guide only because sensor calibration and exposure time matter.</li>
+            <li><strong>Temperature</strong>: Shows how hot or cool the air is. 20-28°C is a comfortable range; above 33°C means take precautions against heat, especially outdoors.</li>
+            <li><strong>Humidity</strong>: Shows moisture in the air. 30-60% is generally comfortable; below 30% is dry, while above 60% feels heavy and may encourage mold.</li>
             <li><strong>System status</strong>: Shows whether the sensor is sending data. Online means connected; Offline means the portal cannot reach the sensor node.</li>
         </ul>
     </div>
@@ -622,6 +622,14 @@ function fetchData() {
             document.getElementById('statusText').style.color = '#a9404a';
                 const recentHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
             renderHistoryRows(recentHistory);
+                chart.data.labels = recentHistory.map((reading, index) => reading.timestamp
+                    ? new Date(reading.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : `Reading ${index + 1}`);
+                chart.data.datasets[0].data = recentHistory.map(reading => Number(reading.pm25)).filter(Number.isFinite);
+                chart.data.datasets[1].data = recentHistory.map(reading => Number(reading.temp)).filter(Number.isFinite);
+                chart.data.datasets[2].data = recentHistory.map(reading => Number(reading.hum)).filter(Number.isFinite);
+                chart.data.datasets[3].data = recentHistory.map(reading => Number(reading.co)).filter(Number.isFinite);
+                chart.update('none');
                 const recentPmHistory = recentHistory
                     .map(reading => Number(reading.pm25))
                     .filter(Number.isFinite);

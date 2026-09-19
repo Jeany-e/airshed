@@ -17,6 +17,8 @@ foreach (firebaseRows('users') as $user) {
         break;
     }
 }
+$showFeedbackPrompt = empty($_SESSION['feedback_prompt_shown']);
+$_SESSION['feedback_prompt_shown'] = true;
 $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfully.' : '';
 
 ?>
@@ -95,6 +97,12 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         .selected-forecast-value { font-size: 32px; font-weight: 900; margin-top: 10px; color: var(--primary); }
         .selected-forecast-note { margin-top: 6px; font-size: 13px; color: #6f708a; }
         .forecast-disclaimer { margin: 12px 0 0; color: #7f7f9a; font-size: 11px; line-height: 1.4; text-align: center; }
+        .forecast-tile { animation: forecastTileFloat 6s ease-in-out infinite; transition: transform .25s ease, box-shadow .25s ease; }
+        .forecast-tile:hover { transform: translateY(-6px); box-shadow: 0 16px 26px rgba(36,104,157,.18); }
+        .forecast-tile:nth-child(2) { animation-delay: -1.5s; }
+        .forecast-tile:nth-child(3) { animation-delay: -3s; }
+        .forecast-tile:nth-child(4) { animation-delay: -4.5s; }
+        @keyframes forecastTileFloat { 0%, 100% { opacity: 1; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
         .status-badge { font-size: 32px; font-weight: 800; margin: 10px 0; display: block; }
 
         .advisory-card { background: #fff; padding: 15px; border-radius: 15px; border: 1px solid #c9e4f2; border-left: 8px solid var(--accent); margin-bottom: 20px; display: flex; align-items: center; gap: 15px; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; animation: panelFloat 5.5s ease-in-out .2s infinite; }
@@ -394,22 +402,22 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:20px;">
-                        <div style="background:#f6f4ff; padding:15px; border-radius:15px; text-align:center;">
+                        <div class="forecast-tile" style="background:#f6f4ff; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">Humidity Forecast</label>
                             <div id="humForecast" style="font-size:24px; font-weight:900;">--</div>
                         </div>
-                        <div style="background:#ecfdf3; padding:15px; border-radius:15px; text-align:center;">
+                        <div class="forecast-tile" style="background:#ecfdf3; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; color:#2e7d32;">Weather Outlook</label>
                             <div id="weatherForecast" style="font-size:18px; font-weight:900;">--</div>
                         </div>
                     </div>
                     <div style="display:flex; gap:10px; margin-top:12px;">
-                        <div style="flex:1; background:#f0f0ff; padding:15px; border-radius:15px; text-align:center;">
+                        <div class="forecast-tile" style="flex:1; background:#f0f0ff; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">PM2.5 · NEXT 5 MINS</label>
                             <div id="predict30" style="font-size:24px; font-weight:900;">--</div>
                             <div style="font-size:11px; font-weight:700; color:#7f7f9a;">µg/m³</div>
                         </div>
-                        <div style="flex:1; background:var(--ai-purple); color:#fff; padding:15px; border-radius:15px; text-align:center;">
+                        <div class="forecast-tile" style="flex:1; background:var(--ai-purple); color:#fff; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; opacity:0.8;">PM2.5 · NEXT 15 MINS</label>
                             <div id="predict2h" style="font-size:24px; font-weight:900;">--</div>
                             <div style="font-size:11px; font-weight:700; opacity:0.8;">µg/m³</div>
@@ -423,10 +431,10 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 <h3>How to Read Your Airshed Dashboard</h3>
                 <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
                 <ul class="guide-list">
-                    <li><strong>PM2.5</strong>: Tiny particles from smoke, dust, and combustion. It is the main air-quality indicator: 0-12 = Good, 12-35 = Moderate, 35+ = Poor.</li>
-                    <li><strong>CO Gas</strong>: Carbon monoxide from burning fuel and combustion. It helps detect smoke or poor ventilation; target below 9 ppm.</li>
-                    <li><strong>Temperature</strong>: Shows how hot or cool the air is and helps explain comfort and weather conditions. The ideal range is 20-28°C.</li>
-                    <li><strong>Humidity</strong>: Shows the moisture in the air and how dry or heavy it feels. 30-60% is optimal.</li>
+                    <li><strong>PM2.5</strong>: Tiny particles from smoke, dust, and combustion. 0-12 µg/m³ = Good; 12-35 = Moderate, so reduce prolonged outdoor exposure; above 35 = Poor, so limit outdoor activity and consider a mask.</li>
+                    <li><strong>CO Gas</strong>: Carbon monoxide from fuel burning. Below 9 ppm is the safer/low range; 9-35 ppm is elevated, so improve ventilation and check combustion sources; above 35 ppm is dangerous, so leave the area and seek help. This is a guide only because sensor calibration and exposure time matter.</li>
+                    <li><strong>Temperature</strong>: Shows how hot or cool the air is. 20-28°C is a comfortable range; above 33°C means take precautions against heat, especially outdoors.</li>
+                    <li><strong>Humidity</strong>: Shows moisture in the air. 30-60% is generally comfortable; below 30% is dry, while above 60% feels heavy and may encourage mold.</li>
                     <li><strong>System status</strong>: Online means the sensor is connected; Offline means the dashboard cannot reach the sensor node.</li>
                 </ul>
             </div>
@@ -563,9 +571,11 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         document.getElementById('feedbackModal').classList.remove('open');
     });
 
+    <?php if ($showFeedbackPrompt): ?>
     setTimeout(() => {
         document.getElementById('feedbackModal').classList.add('open');
     }, 3 * 60 * 1000);
+    <?php endif; ?>
 
     function getForecast(history, minutes) {
         if (history.length < 3) return null;
