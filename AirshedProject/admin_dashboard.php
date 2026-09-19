@@ -884,7 +884,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
     let predictionLocked = false;
     let predictionSnapshot = { pm: null, hum: null, temp: null, outlook: 'Pleasant' };
     let predictionLastUpdatedAt = 0;
-    let predictionWindowMs = 5 * 60 * 1000;
+    let predictionWindowMs = 3000;
 
     function switchView(id, btn) {
         document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active-view'));
@@ -995,7 +995,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         const outlook = currentTemp !== null && currentHum !== null ? getWeatherOutlook(currentTemp, currentHum) : 'Pleasant';
 
         predictionSnapshot = { pm: forecast, hum: forecastHum, temp: forecastTemp, outlook };
-        predictionLocked = true;
+        predictionLocked = false;
         predictionLastUpdatedAt = now;
 
         if (forecast !== null && pmHistory.length) {
@@ -1123,7 +1123,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 body: `temp=${encodeURIComponent(d.temp)}&hum=${encodeURIComponent(d.hum)}&co=${encodeURIComponent(d.co)}&pm25=${encodeURIComponent(d.pm25)}&status=${encodeURIComponent(status)}`
             }).catch(error => console.error('Firebase save error:', error));
 
-            updatePredictionSnapshot();
+            updatePredictionSnapshot(true);
 
             let t = new Date().toLocaleTimeString([], { hour12: false });
             chart.data.labels.push(t);

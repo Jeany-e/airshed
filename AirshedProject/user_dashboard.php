@@ -494,7 +494,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
     let lastAlertRequest = 0;
     let predictionSnapshot = { pm: null, hum: null, temp: null, outlook: 'Pleasant' };
     let predictionLastUpdatedAt = 0;
-    let predictionWindowMs = 5 * 60 * 1000;
+    let predictionWindowMs = 3000;
 
     function switchView(id, btn) {
         document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active-view'));
@@ -588,7 +588,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         const outlook = currentTemp !== null && currentHum !== null ? getWeatherOutlook(currentTemp, currentHum) : 'Pleasant';
 
         predictionSnapshot = { pm: forecast, hum: forecastHum, temp: forecastTemp, outlook };
-        predictionLocked = true;
+        predictionLocked = false;
         predictionLastUpdatedAt = now;
 
         document.getElementById('selectedForecast').innerText = forecast !== null ? Math.max(0, forecast).toFixed(1) : '--';
@@ -680,7 +680,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             pmHistory.push(val);
             if(pmHistory.length > 15) pmHistory.shift();
             if(pmHistory.length >= 3) {
-                updatePredictionSnapshot();
+                updatePredictionSnapshot(true);
                 document.getElementById('predict30').innerText = predictionSnapshot.pm !== null ? Math.max(0, predictionSnapshot.pm).toFixed(1) : '--';
                 document.getElementById('predict2h').innerText = predictionSnapshot.pm !== null ? Math.max(0, predictionSnapshot.pm).toFixed(1) : '--';
             }
