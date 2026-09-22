@@ -150,6 +150,8 @@ foreach ($selectedLogs as $log) {
         .record-files table { min-width: 0; }
         .view-date { display: inline-block; padding: 7px 11px; border-radius: 8px; background: var(--blue-soft); color: var(--blue); text-decoration: none; font-size: 12px; font-weight: 700; }
         .view-date:hover { background: #dbeaff; }
+        .overall-reading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #f9fbfe; color: var(--muted); font-size: 13px; font-weight: 700; }
+        .overall-reading strong { color: var(--blue); font-family: 'Space Grotesk', sans-serif; font-size: 22px; }
         .chart-panel { padding: 22px; margin-bottom: 24px; }
         .chart-scroll { width: 100%; overflow-x: auto; overscroll-behavior: contain; }
         .chart-wrap { height: 300px; min-width: 1200px; }
@@ -371,7 +373,7 @@ foreach ($selectedLogs as $log) {
                 <div class="panel-head" style="padding: 0 0 18px; border-bottom: 0;">
                     <div>
                         <h2>Daily Air Quality Trend</h2>
-                        <span>Temperature, humidity, PM2.5, and CO readings</span>
+                        <span>Temperature, humidity, PM2.5, and MQ gas readings</span>
                     </div>
                 </div>
                 <div class="chart-scroll"><div class="chart-wrap"><canvas id="dailyChart"></canvas></div></div>
@@ -390,7 +392,7 @@ foreach ($selectedLogs as $log) {
                 <?php else: ?>
                     <div class="table-wrap">
                         <table>
-                            <thead><tr><th>Time</th><th>Temperature</th><th>Humidity</th><th>PM2.5</th><th>CO</th><th>Status</th></tr></thead>
+                            <thead><tr><th>Time</th><th>Temperature</th><th>Humidity</th><th>PM2.5</th><th>MQ Gas</th><th>Status</th></tr></thead>
                             <tbody>
                             <?php foreach ($selectedLogs as $log): ?>
                                 <tr>
@@ -398,7 +400,7 @@ foreach ($selectedLogs as $log) {
                                     <td><?php echo number_format((float) ($log['temp'] ?? 0), 1); ?> C</td>
                                     <td><?php echo number_format((float) ($log['hum'] ?? 0), 1); ?>%</td>
                                     <td><?php echo number_format((float) ($log['pm25'] ?? 0), 1); ?> ug/m3</td>
-                                    <td><?php echo number_format((float) ($log['co'] ?? 0), 1); ?> ppm</td>
+                                    <td><?php echo number_format((float) ($log['co'] ?? 0), 1); ?> raw ADC</td>
                                     <td><span class="status"><?php echo htmlspecialchars($log['status'] ?? 'UNKNOWN'); ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -433,6 +435,12 @@ foreach ($selectedLogs as $log) {
                     <button class="search-btn" type="submit">Search</button>
                     <?php if ($searchTerm || $fromInput || $toInput): ?><a class="clear-search" href="sensor_reports.php?day=<?php echo urlencode($selectedDay); ?>">Clear</a><?php endif; ?>
                 </form>
+                <?php if ($days): ?>
+                    <div class="overall-reading">
+                        <span>Overall Readings</span>
+                        <strong><?php echo count($logs); ?></strong>
+                    </div>
+                <?php endif; ?>
                 <div class="table-wrap">
                     <table>
                         <thead><tr><th>Date</th><th>Readings</th><th>Action</th></tr></thead>
