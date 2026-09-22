@@ -623,18 +623,18 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                         <div class="card"><label>Temperature</label><span class="val" id="temp">--</span><span class="unit">°C</span></div>
                         <div class="card"><label>Humidity</label><span class="val" id="hum">--</span><span class="unit">%</span></div>
                         <div class="card" style="border-top-color: #00bcd4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg</span></div>
-                        <div class="card" style="border-top-color: #009688;"><label>CO Gas</label><span class="val" id="co">--</span><span class="unit">ppm</span></div>
+                        <div class="card" style="border-top-color: #009688;"><label>MQ Gas Reading</label><span class="val" id="co">--</span><span class="unit">raw ADC</span></div>
                     </div>
 
                     <div class="guide-card">
                         <h3>How to Read Your Airshed Dashboard</h3>
                         <p>These guidelines clarify what each measurement means and what action to take.</p>
                         <ul class="guide-list">
-                            <li><strong>PM2.5</strong>: 0–12 = Good, 12–35 = Moderate, 35+ = Poor. High values mean unhealthy air.</li>
-                            <li><strong>CO Gas</strong>: Target below 9 ppm. Elevated CO indicates combustion or poor ventilation.</li>
-                            <li><strong>Temperature</strong>: Ideal comfort range is 20–28°C. Extreme heat can reduce air quality perception.</li>
-                            <li><strong>Humidity</strong>: 30–60% is optimal. Below 30% feels dry; above 60% feels heavy.</li>
-                            <li><strong>System status</strong>: Online means the device is connected; Offline means the dashboard cannot reach the sensor node.</li>
+                            <li><strong>PM2.5</strong>: 0-12 = Good; 13-35 = Moderate; 36-55 = Wear a mask; 56-150 = Unhealthy; above 150 = Hazardous.</li>
+                            <li><strong>MQ gas reading</strong>: Raw MQ analog value from the ESP32, not calibrated CO ppm. Below 800 = Normal; 800-1799 = Warning; 1800+ = Danger. Calibrate before treating the value as a concentration.</li>
+                            <li><strong>Temperature</strong>: Current outdoor temperature. At 33°C or higher, advise hydration and reduced heat exposure.</li>
+                            <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, conditions are highly humid.</li>
+                            <li><strong>System status</strong>: Online means recent device data is available; Offline means no live reading is available.</li>
                         </ul>
                     </div>
 

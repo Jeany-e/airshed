@@ -488,18 +488,18 @@ include "config.php";
         <div class="card"><label>Temperature</label><span class="val" id="temp">--</span><span class="unit">Celsius (°C)</span></div>
         <div class="card"><label>Humidity</label><span class="val" id="hum">--</span><span class="unit">Percentage (%)</span></div>
         <div class="card" style="border-top-color: #2b8fc4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg/m³</span></div>
-        <div class="card" style="border-top-color: #0f9f86;"><label>CO Gas</label><span class="val" id="co">--</span><span class="unit">ppm</span></div>
+        <div class="card" style="border-top-color: #0f9f86;"><label>MQ Gas Reading</label><span class="val" id="co">--</span><span class="unit">raw ADC</span></div>
     </div>
 
     <div class="guide-card">
         <h3>How to Read Your Airshed Dashboard</h3>
         <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
         <ul class="guide-list">
-            <li><strong>PM2.5</strong>: Tiny particles from smoke, dust, and combustion. 0-12 µg/m³ = Good; 12-35 = Moderate, so reduce prolonged outdoor exposure; above 35 = Poor, so limit outdoor activity and consider a mask.</li>
-            <li><strong>CO Gas</strong>: Carbon monoxide from fuel burning. Below 9 ppm is the safer/low range; 9-35 ppm is elevated, so improve ventilation and check combustion sources; above 35 ppm is dangerous, so leave the area and seek help. This is a guide only because sensor calibration and exposure time matter.</li>
-            <li><strong>Temperature</strong>: Shows how hot or cool the air is. 20-28°C is a comfortable range; above 33°C means take precautions against heat, especially outdoors.</li>
-            <li><strong>Humidity</strong>: Shows moisture in the air. 30-60% is generally comfortable; below 30% is dry, while above 60% feels heavy and may encourage mold.</li>
-            <li><strong>System status</strong>: Shows whether the sensor is sending data. Online means connected; Offline means the portal cannot reach the sensor node.</li>
+            <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. 0-12 µg/m³ = Good; 13-35 = Moderate; 36-55 = Wear a mask; 56-150 = Unhealthy; above 150 = Hazardous.</li>
+            <li><strong>MQ gas reading</strong>: The ESP32 sends the MQ sensor's raw analog value, not a calibrated CO ppm measurement. Below 800 = Normal; 800-1799 = Warning, so improve ventilation and check possible sources; 1800+ = Danger, so leave the area and seek help. Use this as an alert guide only until the sensor is calibrated.</li>
+            <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
+            <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
+            <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the portal has no live reading to display.</li>
         </ul>
     </div>
 

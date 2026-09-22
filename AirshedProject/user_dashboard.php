@@ -378,7 +378,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">TEMP</label><span class="val" id="temp">--</span><span>°C</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">HUMIDITY</label><span class="val" id="hum">--</span><span>%</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">PM2.5</label><span class="val" id="pm25" style="color:var(--ai-purple);">--</span><span>µg/m³</span></div>
-                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">GAS CO</label><span class="val" id="co">--</span><span>ppm</span></div>
+                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">MQ GAS READING</label><span class="val" id="co">--</span><span>raw ADC</span></div>
                 </div>
                 
                 <div class="ai-panel">
@@ -431,11 +431,11 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 <h3>How to Read Your Airshed Dashboard</h3>
                 <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
                 <ul class="guide-list">
-                    <li><strong>PM2.5</strong>: Tiny particles from smoke, dust, and combustion. 0-12 µg/m³ = Good; 12-35 = Moderate, so reduce prolonged outdoor exposure; above 35 = Poor, so limit outdoor activity and consider a mask.</li>
-                    <li><strong>CO Gas</strong>: Carbon monoxide from fuel burning. Below 9 ppm is the safer/low range; 9-35 ppm is elevated, so improve ventilation and check combustion sources; above 35 ppm is dangerous, so leave the area and seek help. This is a guide only because sensor calibration and exposure time matter.</li>
-                    <li><strong>Temperature</strong>: Shows how hot or cool the air is. 20-28°C is a comfortable range; above 33°C means take precautions against heat, especially outdoors.</li>
-                    <li><strong>Humidity</strong>: Shows moisture in the air. 30-60% is generally comfortable; below 30% is dry, while above 60% feels heavy and may encourage mold.</li>
-                    <li><strong>System status</strong>: Online means the sensor is connected; Offline means the dashboard cannot reach the sensor node.</li>
+                    <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. 0-12 µg/m³ = Good; 13-35 = Moderate; 36-55 = Wear a mask; 56-150 = Unhealthy; above 150 = Hazardous.</li>
+                    <li><strong>MQ gas reading</strong>: The ESP32 sends the MQ sensor's raw analog value, not a calibrated CO ppm measurement. Below 800 = Normal; 800-1799 = Warning, so improve ventilation and check possible sources; 1800+ = Danger, so leave the area and seek help. Use this as an alert guide only until the sensor is calibrated.</li>
+                    <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
+                    <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
+                    <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the dashboard has no live reading to display.</li>
                 </ul>
             </div>
 
@@ -445,7 +445,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                     <span class="chart-legend-item"><span class="chart-legend-line" style="background:#673ab7;"></span>PM2.5 (µg/m³)</span>
                     <span class="chart-legend-item"><span class="chart-legend-line" style="background:#ff7043;"></span>Temperature (°C)</span>
                     <span class="chart-legend-item"><span class="chart-legend-line" style="background:#00a896;"></span>Humidity (%)</span>
-                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#8e44ad;"></span>CO Gas (ppm)</span>
+                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#8e44ad;"></span>MQ Gas (raw ADC)</span>
                 </div>
                 <div class="chart-scroll"><div class="chart-track"><canvas id="pollutantChart" width="1200" height="260"></canvas></div></div>
             </div>
