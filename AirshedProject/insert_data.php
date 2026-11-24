@@ -2,22 +2,25 @@
 include "config.php";
 
 $deviceToken = getenv('AIRSHED_DEVICE_TOKEN');
-$providedToken = $_SERVER['HTTP_X_DEVICE_TOKEN'] ?? '';
 if (!$deviceToken) {
     http_response_code(503);
     exit('Device ingestion is not configured.');
+}
+$providedToken = $_SERVER['HTTP_X_DEVICE_TOKEN'] ?? '';
+if ((!is_string($providedToken) || $providedToken === '') && isset($_POST['device_token'])) {
+    $providedToken = $_POST['device_token'];
 }
 if (!is_string($providedToken) || !hash_equals($deviceToken, $providedToken)) {
     http_response_code(401);
     exit('Unauthorized device.');
 }
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+if (!in_array(($_SERVER['REQUEST_METHOD'] ?? ''), ['GET', 'POST'], true)) {
     http_response_code(405);
-    header('Allow: POST');
-    exit('POST required.');
+    header('Allow: GET, POST');
+    exit('GET or POST required.');
 }
 
-$input = $_POST;
+$input = array_merge($_GET, $_POST);
 $parseReading = function ($value, $minimum, $maximum) {
     if (!is_scalar($value) || !is_numeric($value)) {
         return null;
@@ -27,11 +30,11 @@ $parseReading = function ($value, $minimum, $maximum) {
 };
 $temp = $parseReading($input['temp'] ?? $input['temperature'] ?? null, -40, 85);
 $hum = $parseReading($input['hum'] ?? $input['humidity'] ?? null, 0, 100);
-$co = $parseReading($input['co'] ?? $input['mq_adc'] ?? null, 0, 4095);
+$co = $parseReading($input['co'] ?? $input['mq_adc'] ?? $input['co_ppm'] ?? null, 0, 4095);
 $pm25 = $parseReading($input['pm25'] ?? null, 0, 1000);
 if ($temp === null || $hum === null || $co === null || $pm25 === null) {
     http_response_code(400);
-    exit('Provide valid temperature, humidity, raw MQ ADC, and PM2.5 readings.');
+    exit('Provide valid temp/temperature, hum/humidity, co/mq_adc, and pm25 readings.');
 }
 
 $readStatus = function ($key, $default = '') use ($input) {

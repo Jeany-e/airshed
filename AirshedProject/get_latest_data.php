@@ -51,7 +51,7 @@ try {
     $records = array_slice($records, -5000);
     $latest = $records ? $records[count($records) - 1] : null;
     $latestAge = $latest ? time() - $latest['timestamp_unix'] : null;
-    $live = $latestAge !== null && $latestAge >= -30 && $latestAge <= 45;
+    $live = $latestAge !== null && $latestAge >= -30 && $latestAge <= 90; // Device uploads every 60 seconds.
     $history = array_map(function ($record) {
         return [
             'timestamp' => $record['timestamp'],

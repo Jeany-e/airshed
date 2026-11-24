@@ -14,7 +14,14 @@ Create a repository containing this project folder, including `Dockerfile`,
 
    `FIREBASE_DATABASE_SECRET` = your Firebase Realtime Database server secret
 
+   `AIRSHED_DEVICE_TOKEN` = a long random token also configured on the IoT device
+
 5. Generate a public domain under **Settings > Networking > Public Networking**.
+
+The IoT device can keep its existing GET/POST request fields when calling
+`AirshedProject/insert_data.php`, but it must send the matching token in an
+`X-Device-Token` header or `device_token` POST field. Do not put the token in
+the URL. Without the matching token, the endpoint rejects readings.
 
 The Dockerfile reads Railway's `PORT` variable, so no fixed application port
 needs to be configured in Railway.
@@ -38,6 +45,7 @@ public sensor readings.
 ## Security notes
 
 - Add `FIREBASE_DATABASE_SECRET` only in Railway Variables.
+- Store `AIRSHED_DEVICE_TOKEN` in Railway Variables and the device firmware.
 - Never place the secret in JavaScript or commit it to GitHub.
 - The Firebase rules file intentionally allows public reads only for
   `sensor_logs`; PHP server operations use the server-side secret.
