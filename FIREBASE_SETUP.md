@@ -28,6 +28,22 @@ SetEnv FIREBASE_DATABASE_SECRET "YOUR_SERVER_FIREBASE_SECRET"
 
 Restart Apache after changing it.
 
-## 3. Confirm PHP requirements
+## 3. Configure authenticated device ingestion
+
+The device must send readings to `insert_data.php` with an HTTP `POST` request
+and an `X-Device-Token` header. Configure the same long, random token in the
+device firmware and the PHP server environment:
+
+```apache
+SetEnv AIRSHED_DEVICE_TOKEN "YOUR_PRIVATE_DEVICE_TOKEN"
+```
+
+Send `temp`, `hum`, `co` (raw MQ ADC), and `pm25` as form fields. The endpoint
+rejects requests without the token and validates sensor ranges before saving.
+Do not use the former browser dashboard write endpoint; it now returns `410`.
+Restart Apache after adding the token. If firmware cannot set a custom header,
+update it to do so rather than placing the token in the URL.
+
+## 4. Confirm PHP requirements
 
 The PHP `curl` extension must be enabled. The project has already been checked with PHP and cURL enabled.

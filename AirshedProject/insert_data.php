@@ -1,44 +1,68 @@
 <?php
 include "config.php";
 
-// Accept GET or POST so the device can send readings to the hosted endpoint.
-$input = array_merge($_GET, $_POST);
-$temp = $input['temp'] ?? $input['temperature'] ?? null;
-$hum = $input['hum'] ?? $input['humidity'] ?? null;
-$co = $input['co'] ?? $input['co_ppm'] ?? null;
-$pm25 = $input['pm25'] ?? null;
-$tempStatus = $input['tempStatus'] ?? '';
-$humStatus = $input['humStatus'] ?? '';
-$coStatus = $input['coStatus'] ?? '';
-
-if ($temp === null || $hum === null || $co === null || $pm25 === null) {
-    http_response_code(400);
-    echo 'Missing temp, hum, co, or pm25 sensor data';
-    exit();
+$deviceToken = getenv('AIRSHED_DEVICE_TOKEN');
+$providedToken = $_SERVER['HTTP_X_DEVICE_TOKEN'] ?? '';
+if (!$deviceToken) {
+    http_response_code(503);
+    exit('Device ingestion is not configured.');
+}
+if (!is_string($providedToken) || !hash_equals($deviceToken, $providedToken)) {
+    http_response_code(401);
+    exit('Unauthorized device.');
+}
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    exit('POST required.');
 }
 
-$timestamp = gmdate('c');
+$input = $_POST;
+$parseReading = function ($value, $minimum, $maximum) {
+    if (!is_scalar($value) || !is_numeric($value)) {
+        return null;
+    }
+    $number = (float) $value;
+    return is_finite($number) && $number >= $minimum && $number <= $maximum ? $number : null;
+};
+$temp = $parseReading($input['temp'] ?? $input['temperature'] ?? null, -40, 85);
+$hum = $parseReading($input['hum'] ?? $input['humidity'] ?? null, 0, 100);
+$co = $parseReading($input['co'] ?? $input['mq_adc'] ?? null, 0, 4095);
+$pm25 = $parseReading($input['pm25'] ?? null, 0, 1000);
+if ($temp === null || $hum === null || $co === null || $pm25 === null) {
+    http_response_code(400);
+    exit('Provide valid temperature, humidity, raw MQ ADC, and PM2.5 readings.');
+}
 
-if (firebasePush('sensor_data', [
-    'source' => 'device',
-    'temperature' => (float) $temp,
-    'humidity' => (float) $hum,
-    'co_ppm' => (float) $co,
-    'temp_status' => $tempStatus,
-    'hum_status' => $humStatus,
-    'co_status' => $coStatus,
-    'timestamp' => $timestamp
-]) && firebasePush('sensor_logs', [
-    'source' => 'device',
-    'temp' => (float) $temp,
-    'hum' => (float) $hum,
-    'co' => (float) $co,
-    'pm25' => (float) $pm25,
-    'status' => $input['status'] ?? 'UNKNOWN',
-    'timestamp' => $timestamp
-])){
+$readStatus = function ($key, $default = '') use ($input) {
+    $value = $input[$key] ?? $default;
+    return is_scalar($value) ? substr((string) $value, 0, 32) : $default;
+};
+$timestamp = gmdate('c');
+try {
+    firebasePush('sensor_data', [
+        'source' => 'device',
+        'temperature' => $temp,
+        'humidity' => $hum,
+        'mq_adc' => $co,
+        'temp_status' => $readStatus('tempStatus'),
+        'hum_status' => $readStatus('humStatus'),
+        'co_status' => $readStatus('coStatus'),
+        'timestamp' => $timestamp
+    ]);
+    firebasePush('sensor_logs', [
+        'source' => 'device',
+        'temp' => $temp,
+        'hum' => $hum,
+        'co' => $co,
+        'pm25' => $pm25,
+        'status' => $readStatus('status', 'UNKNOWN'),
+        'timestamp' => $timestamp
+    ]);
     echo 'Data inserted successfully';
-} else {
-    echo "Error inserting data";
+} catch (Throwable $error) {
+    error_log('Device ingestion failed: ' . $error->getMessage());
+    http_response_code(502);
+    echo 'Sensor data could not be saved.';
 }
 ?>

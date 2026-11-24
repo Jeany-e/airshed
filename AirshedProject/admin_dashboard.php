@@ -10,6 +10,14 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
+$escapeHtml = function ($value) {
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+};
+
 // Load Firebase collections and recreate the display fields used by the page.
 $users = firebaseRows('users');
 $userNames = [];
@@ -58,9 +66,11 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?php echo $escapeHtml($csrfToken); ?>">
     <title>Airshed MS | Calapan City Admin</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="air_quality.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
@@ -111,7 +121,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         .range-selector .selector-label { color: #4e5667; font-weight: 700; font-size: 13px; white-space: nowrap; }
         .pred-range-btn { min-width: 70px; padding: 10px 18px; border-radius: 999px; border: 1px solid #c9e4f2; background: #eef8ff; color: #38566e; cursor: pointer; transition: all 0.25s ease; font-weight: 700; }
         .pred-range-btn.active, .pred-range-btn:hover { background: var(--primary); color: #fff; box-shadow: 0 12px 24px rgba(23,78,166,0.18); }
-        .forecast-meta { margin-bottom: 12px; color: #5f677a; font-size: 13px; }
+        .forecast-meta { margin-bottom: 12px; color: #5f677a; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
         .forecast-card { background: #fff; padding: 22px; border-radius: 18px; border: 1px solid #c9e4f2; box-shadow: 0 12px 26px rgba(36,104,157,0.12); animation: panelFloat 5.5s ease-in-out 0.4s infinite; }
         
         .card label { display: block; font-size: 11px; font-weight: 800; color: #7f8c8d; text-transform: uppercase; margin-bottom: 10px; }
@@ -554,6 +564,9 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         <div id="clock" style="font-weight: 800; background: #eef2ff; padding: 8px 18px; border-radius: 50px; color: var(--primary);"></div>
     </div>
     <div id="pageTitle" class="page-title">Dashboard Overview</div>
+    <?php if (isset($_GET['account_name_updated'])): ?>
+        <div style="margin:12px 0; padding:12px 16px; border-radius:8px; background:#e8f5e9; color:#2e7d32; font-weight:700;">Account name updated successfully.</div>
+    <?php endif; ?>
 
     <div class="scroll-area">
         <div id="v-dash" class="view-section active-view">
@@ -585,33 +598,33 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 </div>
                 <div class="range-selector">
                     <span class="selector-label">Prediction Range</span>
-                    <button class="pred-range-btn active" onclick="setPredictionRange(5,this)">5m</button>
-                    <button class="pred-range-btn" onclick="setPredictionRange(60,this)">1h</button>
+                    <button class="pred-range-btn active" onclick="setPredictionRange(30,this)">30m</button>
                     <button class="pred-range-btn" onclick="setPredictionRange(120,this)">2h</button>
-                    <button class="pred-range-btn" onclick="setPredictionRange(360,this)">6h</button>
-                    <button class="pred-range-btn" onclick="setPredictionRange(720,this)">12h</button>
                 </div>
-                <div id="selectedRangeLabel" class="forecast-meta">Viewing next 5 minute forecast</div>
+                <div id="selectedRangeLabel" class="forecast-meta">Viewing next 30 minute forecast</div>
                 <div class="forecast-card">
-                    <div class="forecast-meta" id="forecastRangeLabel">Next 5 minute forecast</div>
+                    <div class="forecast-meta" id="forecastRangeLabel">Next 30 minute forecast</div>
                     <div style="display: flex; align-items: baseline; justify-content: center; gap: 5px;">
                         <span id="forecastVal" style="font-size: 40px; font-weight: 900; color: var(--ai-purple);">---</span>
                         <span class="unit">µg/m³</span>
                     </div>
+                    <div class="forecast-meta" id="selectedForecastMeta"></div>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px;">
                     <div style="background:#f6f4ff; padding:14px; border-radius:12px; border:1px solid #e8e0ff; text-align:center;">
                         <div style="font-size:11px; font-weight:800; color:var(--ai-purple); text-transform:uppercase;">Humidity Forecast</div>
                         <div id="humidityForecast" style="font-size:24px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
+                        <div class="forecast-meta" id="humidityForecastMeta"></div>
                     </div>
                     <div style="background:#ecfdf3; padding:14px; border-radius:12px; border:1px solid #dcfce7; text-align:center;">
                         <div style="font-size:11px; font-weight:800; color:#2e7d32; text-transform:uppercase;">Weather Outlook</div>
                         <div id="weatherForecast" style="font-size:18px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
+                        <div class="forecast-meta" id="weatherForecastMeta"></div>
                     </div>
                 </div>
                 <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0; display: flex; align-items: center; margin-top: 14px;">
                     <div>
-                        <label>MACHINE LEARNING INSIGHT</label>
+                        <label>FORECAST & VALIDATION INSIGHT</label>
                         <div id="aiInsight" style="font-size: 16px; font-weight: 600; color: #2c3e50;">
                             Initializing pattern recognition...
                         </div>
@@ -624,7 +637,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                     <div class="metrics-grid">
                         <div class="card"><label>Temperature</label><span class="val" id="temp">--</span><span class="unit">°C</span></div>
                         <div class="card"><label>Humidity</label><span class="val" id="hum">--</span><span class="unit">%</span></div>
-                        <div class="card" style="border-top-color: #00bcd4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg</span></div>
+                        <div class="card" style="border-top-color: #00bcd4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg/m³</span></div>
                         <div class="card" style="border-top-color: #009688;"><label>MQ Gas Reading</label><span class="val" id="co">--</span><span class="unit">raw ADC</span></div>
                     </div>
 
@@ -632,7 +645,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                         <h3>How to Read Your Airshed Dashboard</h3>
                         <p>These guidelines clarify what each measurement means and what action to take.</p>
                         <ul class="guide-list">
-                            <li><strong>PM2.5</strong>: 0-12 = Good; 13-35 = Moderate; 36-55 = Wear a mask; 56-150 = Unhealthy; above 150 = Hazardous.</li>
+                            <li><strong>PM2.5</strong>: The shared scale is 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. Missing or out-of-range values are not classified.</li>
                             <li><strong>MQ gas reading</strong>: Raw MQ analog value from the ESP32, not calibrated CO ppm. Below 800 = Normal; 800-1799 = Warning; 1800+ = Danger. Calibrate before treating the value as a concentration.</li>
                             <li><strong>Temperature</strong>: Current outdoor temperature. At 33°C or higher, advise hydration and reduced heat exposure.</li>
                             <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, conditions are highly humid.</li>
@@ -651,7 +664,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                         <div class="history-table-wrap">
                             <table id="fullLogTable">
                                 <thead>
-                                    <tr><th>Timestamp</th><th>Temp</th><th>Humid</th><th>PM2.5</th><th>CO Gas</th><th>AQI Status</th><th>Device</th></tr>
+                                    <tr><th>Timestamp</th><th>Temp</th><th>Humid</th><th>PM2.5</th><th>MQ Gas (raw ADC)</th><th>AQI Status</th><th>Device</th></tr>
                                 </thead>
                                 <tbody id="historyBody"></tbody>
                             </table>
@@ -674,20 +687,20 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                     <tbody>
                         <?php foreach($report_result as $report): ?>
                         <tr>
-                            <td><small><?php echo date('M d, g:i A', strtotime($report['reported_at'])); ?></small></td>
-                            <td><b><?php echo htmlspecialchars($report['username']); ?></b></td>
-                            <td style="color: var(--primary); font-weight: bold;"><?php echo $report['incident_type']; ?></td>
-                            <td><small><?php echo $report['location']; ?></small></td>
-                            <td style="text-align: left; font-size: 13px; max-width: 250px;"><?php echo $report['description']; ?></td>
+                            <td><small><?php echo $escapeHtml(date('M d, g:i A', strtotime($report['reported_at'] ?? '') ?: 0)); ?></small></td>
+                            <td><b><?php echo $escapeHtml($report['username'] ?? 'Anonymous'); ?></b></td>
+                            <td style="color: var(--primary); font-weight: bold;"><?php echo $escapeHtml($report['incident_type'] ?? ''); ?></td>
+                            <td><small><?php echo $escapeHtml($report['location'] ?? ''); ?></small></td>
+                            <td style="text-align: left; font-size: 13px; max-width: 250px;"><?php echo $escapeHtml($report['description'] ?? ''); ?></td>
                             <td>
                                 <span style="padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: bold; 
-                                    background: <?php echo ($report['status'] == 'Pending') ? '#fff3e0' : '#e8f5e9'; ?>; 
-                                    color: <?php echo ($report['status'] == 'Pending') ? '#ef6c00' : '#2e7d32'; ?>;">
-                                    <?php echo strtoupper($report['status']); ?>
+                                    background: <?php echo (($report['status'] ?? '') === 'Pending') ? '#fff3e0' : '#e8f5e9'; ?>;
+                                    color: <?php echo (($report['status'] ?? '') === 'Pending') ? '#ef6c00' : '#2e7d32'; ?>;">
+                                    <?php echo $escapeHtml(strtoupper((string) ($report['status'] ?? 'Unknown'))); ?>
                                 </span>
-                                <?php if($report['status'] == 'Pending'): ?>
+                                <?php if(($report['status'] ?? '') === 'Pending'): ?>
                                     <br>
-                                    <button onclick="confirmResolve(<?php echo $report['id']; ?>)" class="resolve-btn">
+                                    <button onclick="confirmResolve(<?php echo htmlspecialchars(json_encode((string) ($report['id'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>)" class="resolve-btn">
                                         RESOLVE NOW
                                     </button>
                                 <?php endif; ?>
@@ -718,19 +731,19 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                     </thead>
                     <tbody>
                         <?php foreach($user_result as $user): ?>
-                        <tr class="user-row" data-role="<?php echo htmlspecialchars($user['role'] ?? 'user', ENT_QUOTES); ?>">
-                            <td>#<?php echo $user['id']; ?></td>
-                            <td style="font-weight: bold; color: var(--primary);"><?php echo $user['username']; ?></td>
-                            <td><?php echo $user['email']; ?></td>
-                            <td><?php echo $user['phone']; ?></td>
-                            <td><span style="background: #eef2ff; padding: 4px 10px; border-radius: 5px; font-size: 12px; font-weight: bold;"><?php echo strtoupper($user['role']); ?></span></td>
-                            <td><?php echo date('M d, Y', strtotime($user['created_at'])); ?></td>
+                        <tr class="user-row" data-role="<?php echo $escapeHtml($user['role'] ?? 'user'); ?>">
+                            <td>#<?php echo $escapeHtml($user['id'] ?? ''); ?></td>
+                            <td style="font-weight: bold; color: var(--primary);"><?php echo $escapeHtml($user['username'] ?? ''); ?></td>
+                            <td><?php echo $escapeHtml($user['email'] ?? ''); ?></td>
+                            <td><?php echo $escapeHtml($user['phone'] ?? ''); ?></td>
+                            <td><span style="background: #eef2ff; padding: 4px 10px; border-radius: 5px; font-size: 12px; font-weight: bold;"><?php echo $escapeHtml(strtoupper((string) ($user['role'] ?? 'user'))); ?></span></td>
+                            <td><?php echo $escapeHtml(date('M d, Y', strtotime($user['created_at'] ?? '') ?: 0)); ?></td>
                             <td>
                                 <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                                <button type="button" class="edit-name-btn" onclick="editAccountName('<?php echo htmlspecialchars($user['id'], ENT_QUOTES); ?>', <?php echo json_encode($user['username'] ?? ''); ?>)">EDIT NAME</button>
+                                <button type="button" class="edit-name-btn" onclick="editAccountName(<?php echo htmlspecialchars(json_encode((string) ($user['id'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode((string) ($user['username'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>)">EDIT NAME</button>
                                 <?php if (($user['role'] ?? 'user') !== 'admin'): ?>
                                     <form method="POST" action="promote_user.php" onsubmit="return confirm('Make this user an administrator?');">
-                                        <input type="hidden" name="id" value="<?php echo htmlspecialchars($user['id'], ENT_QUOTES); ?>">
+                                        <input type="hidden" name="id" value="<?php echo $escapeHtml($user['id'] ?? ''); ?>">
                                         <button type="submit" class="promote-btn">MAKE ADMIN</button>
                                     </form>
                                 <?php else: ?>
@@ -881,7 +894,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
     // Lahat ng dating JavaScript functions mo ay mananatili dito...
     let map;
     let lastEmailSentTime = 0;
-    let selectedPredictionMinutes = 5;
+    let selectedPredictionMinutes = 30;
     let tempHistory = [];
     let humHistory = [];
     let predictionHistory = [];
@@ -889,6 +902,8 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
     let serverForecast2h = null;
     let serverForecastTemp = null;
     let serverForecastHum = null;
+    let forecastMetrics = {};
+    let forecastBasis = {};
     let liveDataAvailable = false;
     let offlineReadingShown = false;
     let predictionLocked = false;
@@ -935,11 +950,13 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 input: 'text',
                 inputLabel: 'Username',
                 inputValue: currentName,
+                inputAttributes: { maxlength: 50, autocapitalize: 'off' },
                 showCancelButton: true,
                 confirmButtonText: 'Save name',
                 confirmButtonColor: '#174ea6',
                 inputValidator: value => {
                     if (!value || !value.trim()) return 'Please enter a username.';
+                    if (value.trim().length > 50) return 'Usernames may not exceed 50 characters.';
                     return null;
                 }
         }).then(result => {
@@ -959,7 +976,12 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 nameInput.name = 'username';
                 nameInput.value = result.value.trim();
 
-                form.append(idInput, nameInput);
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = document.querySelector('meta[name="csrf-token"]').content;
+
+                form.append(idInput, nameInput, csrfInput);
                 document.body.appendChild(form);
                 form.submit();
         });
@@ -983,23 +1005,20 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                     pointHoverRadius: 6,
                     pointBorderWidth: 2,
                     pointBackgroundColor: function(context) {
-                        const value = Number(context.raw);
-                        return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                        return AirshedAirQuality.classifyPm25(context.raw).color;
                     },
                     pointBorderColor: function(context) {
-                        const value = Number(context.raw);
-                        return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                        return AirshedAirQuality.classifyPm25(context.raw).color;
                     },
                     segment: {
                         borderColor: function(context) {
-                            const value = Number(context.p1.raw);
-                            return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                            return AirshedAirQuality.classifyPm25(context.p1.raw).color;
                         }
                     }
                 },
                 { label: 'Temperature (°C)', data: [], borderColor: '#ff7043', backgroundColor: 'transparent', fill: false, tension: 0.4, yAxisID: 'y1' },
                 { label: 'Humidity (%)', data: [], borderColor: '#00a896', backgroundColor: 'transparent', fill: false, tension: 0.4, yAxisID: 'y2' },
-                { label: 'Gas/MQ', data: [], borderColor: '#8e44ad', backgroundColor: 'transparent', fill: false, tension: 0.4, yAxisID: 'y3' }
+                { label: 'MQ Gas (raw ADC)', data: [], borderColor: '#8e44ad', backgroundColor: 'transparent', fill: false, tension: 0.4, yAxisID: 'y3' }
             ] 
         },
         options: { 
@@ -1010,7 +1029,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 y: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: 'PM2.5' } },
                 y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Temp (°C)' } },
                 y2: { type: 'linear', position: 'left', beginAtZero: true, display: false, title: { display: true, text: 'Humidity (%)' } },
-                y3: { type: 'linear', position: 'right', beginAtZero: true, display: false, title: { display: true, text: 'Gas/MQ' } }
+                y3: { type: 'linear', position: 'right', beginAtZero: true, display: false, title: { display: true, text: 'MQ Gas (raw ADC)' } }
             } 
         }
     });
@@ -1018,7 +1037,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
     function setPredictionRange(minutes, btn) {
         selectedPredictionMinutes = minutes;
         predictionWindowMs = minutes * 60 * 1000;
-        const rangeText = minutes === 720 ? '12 hours' : minutes === 360 ? '6 hours' : minutes === 120 ? '2 hours' : minutes === 60 ? '1 hour' : '5 minutes';
+        const rangeText = minutes === 120 ? '2 hours' : '30 minutes';
         document.getElementById('selectedRangeLabel').innerText = `Viewing next ${rangeText} forecast`;
         document.getElementById('forecastRangeLabel').innerText = `Next ${rangeText} forecast`;
         document.querySelectorAll('.pred-range-btn').forEach(b => b.classList.remove('active'));
@@ -1028,25 +1047,8 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         updatePredictionSnapshot(true);
     }
 
-    function runAIPrediction(dataPoints, minutes) {
-        if (dataPoints.length < 3) return null;
-        let n = dataPoints.length;
-        let x = [], y = dataPoints;
-        for (let i = 0; i < n; i++) x.push(i);
-        let sumX = x.reduce((a,b) => a+b, 0), sumY = y.reduce((a,b) => a+b, 0);
-        let sumXY = x.reduce((acc, curr, i) => acc + (curr * y[i]), 0);
-        let sumXX = x.reduce((a,b) => a + (b*b), 0);
-        let denom = (n * sumXX - sumX * sumX);
-        if (denom === 0) return null;
-        let slope = (n * sumXY - sumX * sumY) / denom;
-        let intercept = (sumY - slope * sumX) / n;
-        const sampleIntervalSeconds = 3;
-        const steps = Math.max(1, Math.round((minutes * 60) / sampleIntervalSeconds));
-        let targetIndex = (n - 1) + steps;
-        return slope * targetIndex + intercept;
-    }
-
     function getWeatherOutlook(temp, hum) {
+        if (temp === null || temp === undefined || temp === '' || !Number.isFinite(Number(temp))) return 'Unavailable';
         if (temp >= 33) return "Hot";
         if (temp >= 28) return "Warm";
         if (temp <= 20) return "Cool";
@@ -1062,38 +1064,57 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
             predictionLocked = false;
             predictionLastUpdatedAt = now;
             document.getElementById('forecastVal').innerText = '--';
+            document.getElementById('selectedForecastMeta').innerText = 'Forecast paused while the sensor is offline.';
             document.getElementById('humidityForecast').innerText = '--';
+            document.getElementById('humidityForecastMeta').innerText = 'Forecast paused while the sensor is offline.';
             document.getElementById('weatherForecast').innerText = 'No live sensor data';
+            document.getElementById('weatherForecastMeta').innerText = 'Forecast paused while the sensor is offline.';
             document.getElementById('aiInsight').innerText = 'Forecasts are paused while the sensor is offline.';
             return;
         }
 
-        const pmHistory = predictionHistory.length ? predictionHistory.map(reading => reading.pm25) : chart.data.datasets[0].data;
+        const pmHistory = predictionHistory.length
+            ? predictionHistory.map(reading => reading.pm25 === null || reading.pm25 === undefined ? NaN : Number(reading.pm25))
+            : chart.data.datasets[0].data;
         const currentTemp = tempHistory.length ? tempHistory[tempHistory.length - 1] : null;
         const currentHum = humHistory.length ? humHistory[humHistory.length - 1] : null;
-        const forecast = (selectedPredictionMinutes === 30 && serverForecast30 !== null)
-            ? serverForecast30
-            : ((selectedPredictionMinutes === 120 && serverForecast2h !== null)
-                ? serverForecast2h
-                : (runAIPrediction(pmHistory, selectedPredictionMinutes) ?? (pmHistory.length ? pmHistory[pmHistory.length - 1] : null)));
-        const forecastTemp = serverForecastTemp !== null ? serverForecastTemp : (runAIPrediction(tempHistory, 5) ?? currentTemp);
-        const forecastHum = serverForecastHum !== null ? serverForecastHum : (runAIPrediction(humHistory, 5) ?? currentHum);
+        const forecast = selectedPredictionMinutes === 30 ? serverForecast30 : serverForecast2h;
+        const forecastTemp = serverForecastTemp;
+        const forecastHum = serverForecastHum;
         const outlook = currentTemp !== null && currentHum !== null ? getWeatherOutlook(currentTemp, currentHum) : 'Pleasant';
 
         predictionSnapshot = { pm: forecast, hum: forecastHum, temp: forecastTemp, outlook };
         predictionLocked = false;
         predictionLastUpdatedAt = now;
 
+        document.getElementById('forecastVal').innerText = forecast !== null ? Math.max(0, forecast).toFixed(1) : '--';
+        document.getElementById('selectedForecastMeta').innerText = AirshedAirQuality.forecastSummary(
+            selectedPredictionMinutes === 30 ? forecastMetrics.forecast30 : forecastMetrics.forecast2h,
+            selectedPredictionMinutes === 30 ? forecastBasis.pm25_30m : forecastBasis.pm25_2h
+        );
+        document.getElementById('humidityForecast').innerText = forecastHum !== null ? `${forecastHum.toFixed(1)}%` : '--';
+        document.getElementById('humidityForecastMeta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast_hum, forecastBasis.hum);
+        document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTemp !== null ? `${forecastTemp.toFixed(1)}°C` : '...'}`;
+        document.getElementById('weatherForecastMeta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast_temp, forecastBasis.temp);
+
         if (forecast !== null && pmHistory.length) {
-            document.getElementById('forecastVal').innerText = Math.max(0, forecast).toFixed(1);
             const currentPM = pmHistory[pmHistory.length - 1];
             const insight = document.getElementById('aiInsight');
+            if (!Number.isFinite(currentPM)) {
+                insight.innerText = AirshedAirQuality.forecastSummary(
+                    selectedPredictionMinutes === 30 ? forecastMetrics.forecast30 : forecastMetrics.forecast2h,
+                    selectedPredictionMinutes === 30 ? forecastBasis.pm25_30m : forecastBasis.pm25_2h
+                );
+                return;
+            }
             let trendText = forecast > currentPM + 1.5 ? "📈 <span style='color:var(--danger)'>DETECTED UPWARD TREND</span>" : (forecast < currentPM - 1.5 ? "📉 <span style='color:var(--accent)'>DETECTED DOWNWARD TREND</span>" : "📊 <span style='color:var(--primary)'>STABLE PATTERN</span>");
             insight.innerHTML = `${trendText}<br><b>Weather:</b> ${outlook} with humidity forecast at ${forecastHum !== null ? `${forecastHum.toFixed(1)}%` : '--'}.`;
+        } else {
+            document.getElementById('aiInsight').innerText = AirshedAirQuality.forecastSummary(
+                selectedPredictionMinutes === 30 ? forecastMetrics.forecast30 : forecastMetrics.forecast2h,
+                selectedPredictionMinutes === 30 ? forecastBasis.pm25_30m : forecastBasis.pm25_2h
+            );
         }
-
-        document.getElementById('humidityForecast').innerText = forecastHum !== null ? `${forecastHum.toFixed(1)}%` : '--';
-        document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTemp !== null ? `${forecastTemp.toFixed(1)}°C` : '...'}`;
     }
 
     function runWatchdogAutomation(currentPM25) {
@@ -1101,18 +1122,22 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         const now = Date.now();
         const cooldown = 30 * 60 * 1000; 
 
-        if (val > 35 && (now - lastEmailSentTime > cooldown)) {
-            let formData = new FormData();
-            formData.append('pm25', val);
-            fetch('automated_alerts.php', { method: 'POST', body: formData })
-            .then(res => res.text())
-            .then(msg => { lastEmailSentTime = now; })
-            .catch(err => console.error(err));
+        if (AirshedAirQuality.isAlertLevel(AirshedAirQuality.classifyPm25(val).level)
+            && (now - lastEmailSentTime > cooldown)) {
+            fetch('automated_alerts.php', { method: 'POST' })
+            .then(res => {
+                if (!res.ok) throw new Error(`Alert request failed (${res.status})`);
+                lastEmailSentTime = now;
+            })
+            .catch(err => {
+                lastEmailSentTime = now - 25 * 60 * 1000;
+                console.error(err);
+            });
         }
     }
 
     function exportToCSV() {
-        let csv = "Timestamp,Temperature,Humidity,PM2.5,CO Gas,AQI Status,Device Status\n";
+        let csv = "Timestamp,Temperature,Humidity,PM2.5,MQ Gas (raw ADC),AQI Status,Device Status\n";
         const rows = document.querySelectorAll("#historyBody tr");
         rows.forEach(row => {
             const cols = row.querySelectorAll("td");
@@ -1130,17 +1155,22 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
 
     function fetchData() {
         fetch('get_latest_data.php', { cache: 'no-store' })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error(`Sensor data request failed (${res.status})`);
+            return res.json();
+        })
         .then(d => {
             serverForecast30 = d.forecast30 !== undefined ? d.forecast30 : null;
             serverForecast2h = d.forecast2h !== undefined ? d.forecast2h : null;
             serverForecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : null;
             serverForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
+            forecastMetrics = d.forecast_metrics || {};
+            forecastBasis = d.forecast_basis || {};
             if (d.live === false) {
                 liveDataAvailable = false;
                 predictionHistory = d.prediction_history || [];
-                tempHistory = predictionHistory.map(reading => Number(reading.temp));
-                humHistory = predictionHistory.map(reading => Number(reading.hum));
+                tempHistory = predictionHistory.map(reading => reading.temp === null || reading.temp === undefined ? NaN : Number(reading.temp));
+                humHistory = predictionHistory.map(reading => reading.hum === null || reading.hum === undefined ? NaN : Number(reading.hum));
                 document.getElementById('temp').innerText = '--';
                 document.getElementById('hum').innerText = '--';
                 document.getElementById('pm25').innerText = '--';
@@ -1174,17 +1204,19 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
 
             const outlook = getWeatherOutlook(currentTemp, currentHum);
 
-            document.getElementById('temp').innerText = d.temp;
-            document.getElementById('hum').innerText = d.hum;
-            document.getElementById('pm25').innerText = Number(d.pm25).toFixed(1);
-            document.getElementById('pm25').style.color = Number(d.pm25) > 35 ? "#d32f2f" : (Number(d.pm25) > 12 ? "#d88a18" : "#168a68");
-            document.getElementById('co').innerText = d.co;
+            document.getElementById('temp').innerText = d.temp === null ? '--' : d.temp;
+            document.getElementById('hum').innerText = d.hum === null ? '--' : d.hum;
+            const pmValue = d.pm25 === null || d.pm25 === undefined ? null : Number(d.pm25);
+            document.getElementById('pm25').innerText = pmValue === null ? '--' : pmValue.toFixed(1);
+            const classification = AirshedAirQuality.classifyPm25(d.pm25);
+            document.getElementById('pm25').style.color = classification.color;
+            document.getElementById('co').innerText = d.co === null ? '--' : d.co;
             document.getElementById('bat').innerText = d.battery;
 
             runWatchdogAutomation(d.pm25);
 
-            let status = d.pm25 > 35 ? "POOR" : (d.pm25 > 12 ? "MODERATE" : "GOOD");
-            let color = d.pm25 > 35 ? "#d32f2f" : (d.pm25 > 12 ? "#fbc02d" : "#00c853");
+            let status = classification.label;
+            let color = classification.color;
             
             document.getElementById('statusText').innerText = status;
             document.getElementById('statusText').style.color = color;
@@ -1196,25 +1228,27 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
             const advText = document.getElementById('advText');
             const advIcon = document.getElementById('advIcon');
             const adviceBox = document.getElementById('advice');
-            if(d.pm25 > 35) {
+            if(classification.level === 'HAZARDOUS') {
+                advIcon.innerText = "🚨";
+                advText.innerText = "Hazardous air detected. Avoid outdoor exposure and follow local health guidance.";
+                adviceBox.innerText = "Hazardous PM2.5 levels detected. Stay indoors and follow local health advisories.";
+            } else if(AirshedAirQuality.isAlertLevel(classification.level)) {
                 advIcon.innerText = "😷";
                 advText.innerText = "Air quality is unhealthy. Masking is highly recommended.";
                 adviceBox.innerText = "High PM2.5 detected. Limit outdoor exposure and avoid exercise outside.";
-            } else if(d.pm25 > 12) {
+            } else if(classification.level === 'MODERATE') {
                 advIcon.innerText = "⚠️";
                 advText.innerText = "Moderate conditions. Sensitive groups should stay alert.";
                 adviceBox.innerText = "Moderate air pollution. Consider reducing prolonged outdoor activity.";
-            } else {
+            } else if (classification.level === 'GOOD') {
                 advIcon.innerText = "✅";
-                advText.innerText = "Excellent air quality! Perfect for outdoor activities.";
+                advText.innerText = "Good air quality! Suitable for normal outdoor activities.";
                 adviceBox.innerText = "Air quality is good. Routine outdoor activities are safe.";
+            } else {
+                advIcon.innerText = "⚠️";
+                advText.innerText = "PM2.5 reading is unavailable or outside the valid range.";
+                adviceBox.innerText = "Check the sensor before relying on its air-quality classification.";
             }
-
-            fetch('save_all.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `temp=${encodeURIComponent(d.temp)}&hum=${encodeURIComponent(d.hum)}&co=${encodeURIComponent(d.co)}&pm25=${encodeURIComponent(d.pm25)}&status=${encodeURIComponent(status)}`
-            }).catch(error => console.error('Firebase save error:', error));
 
             updatePredictionSnapshot(true);
 
@@ -1227,19 +1261,19 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 ? new Date(reading.timestamp).toLocaleTimeString([], { hour12: false })
                 : `Reading ${index + 1}`);
             chart.data.datasets[0].data = chartHistory.map(reading => {
-                const value = Number(reading.pm25);
+                const value = reading.pm25 === null || reading.pm25 === undefined ? NaN : Number(reading.pm25);
                 return Number.isFinite(value) && value >= 0 && value <= 1000 ? value : null;
             });
             chart.data.datasets[1].data = chartHistory.map(reading => {
-                const value = Number(reading.temp);
-                return Number.isFinite(value) && value > 0 && value <= 60 ? value : null;
+                const value = reading.temp === null || reading.temp === undefined ? NaN : Number(reading.temp);
+                return Number.isFinite(value) && value >= -40 && value <= 85 ? value : null;
             });
             chart.data.datasets[2].data = chartHistory.map(reading => {
-                const value = Number(reading.hum);
+                const value = reading.hum === null || reading.hum === undefined ? NaN : Number(reading.hum);
                 return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
             });
             chart.data.datasets[3].data = chartHistory.map(reading => {
-                const value = Number(reading.co);
+                const value = reading.co === null || reading.co === undefined ? NaN : Number(reading.co);
                 return Number.isFinite(value) && value >= 0 ? value : null;
             });
             const pmValues = chart.data.datasets[0].data.map(value => Number(value)).filter(Number.isFinite);
@@ -1249,17 +1283,24 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 : 40;
             chart.update('none');
 
-            const pmValue = parseFloat(d.pm25);
-            const pmColor = pmValue > 35 ? "#d32f2f" : (pmValue > 12 ? "#d88a18" : "#168a68");
-            let row = `<tr><td><b>${t}</b></td><td>${d.temp}°C</td><td>${d.hum}%</td><td style="color:${pmColor}; font-weight:900;">${pmValue.toFixed(1)}</td><td>${d.co}</td><td style="color:${color}; font-weight:bold;">${status}</td><td style="color:var(--accent); font-weight:bold;">ONLINE</td></tr>`;
+            const pmColor = AirshedAirQuality.classifyPm25(pmValue).color;
+            let row = `<tr><td><b>${t}</b></td><td>${d.temp === null ? '--' : `${d.temp}°C`}</td><td>${d.hum === null ? '--' : `${d.hum}%`}</td><td style="color:${pmColor}; font-weight:900;">${pmValue === null ? '--' : pmValue.toFixed(1)}</td><td>${d.co === null ? '--' : d.co}</td><td style="color:${color}; font-weight:bold;">${status}</td><td style="color:var(--accent); font-weight:bold;">ONLINE</td></tr>`;
             const hBody = document.getElementById('historyBody');
             hBody.insertAdjacentHTML("afterbegin", row);
             if(hBody.rows.length > 15) hBody.deleteRow(15);
         })
         .catch(err => {
-            document.getElementById('statusText').innerText = "OFFLINE";
+            console.error(err);
+            document.getElementById('statusText').innerText = "DATA UNAVAILABLE";
             document.getElementById('sideStatus').innerText = "Offline";
             document.getElementById('sideStatus').style.color = "var(--danger)";
+            ['temp', 'hum', 'pm25', 'co', 'bat'].forEach(id => {
+                document.getElementById(id).innerText = '--';
+            });
+            document.getElementById('selectedForecastMeta').innerText = 'No validated forecast: sensor data could not be loaded.';
+            document.getElementById('forecastVal').innerText = '--';
+            document.getElementById('humidityForecast').innerText = '--';
+            document.getElementById('weatherForecast').innerText = 'Data unavailable';
         });
     }
 

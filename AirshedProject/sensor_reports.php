@@ -32,6 +32,17 @@ if (isset($_SESSION[$reportsCacheKey]['logs'], $_SESSION[$reportsCacheKey]['crea
     }
 }
 
+$logs = array_values(array_filter($logs, function ($log) {
+    return ($log['source'] ?? '') === 'device';
+}));
+foreach ($logs as &$log) {
+    $log['temp'] = $log['temp'] ?? $log['temperature'] ?? null;
+    $log['hum'] = $log['hum'] ?? $log['humidity'] ?? null;
+    $log['co'] = $log['co'] ?? $log['co_ppm'] ?? null;
+    $log['pm25'] = $log['pm25'] ?? $log['pm2_5'] ?? $log['pm2.5'] ?? null;
+}
+unset($log);
+
 usort($logs, function ($a, $b) {
     return strcmp($b['timestamp'] ?? '', $a['timestamp'] ?? '');
 });
@@ -46,8 +57,15 @@ foreach ($logs as $log) {
     $days[$day][] = $log;
 }
 
-$selectedDay = $_GET['day'] ?? (array_key_first($days) ?: date('Y-m-d'));
+$requestedDay = trim($_GET['day'] ?? '');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDay)) {
+    $requestedDay = '';
+}
+$selectedDay = isset($days[$requestedDay]) ? $requestedDay : (array_key_first($days) ?: date('Y-m-d'));
 $selectedLogs = $days[$selectedDay] ?? [];
+$dailyLogs = $selectedLogs;
+$previousDay = date('Y-m-d', strtotime($selectedDay . ' -1 day'));
+$previousDayLogs = $days[$previousDay] ?? [];
 $searchTerm = trim($_GET['search'] ?? '');
 $fromInput = trim($_GET['from'] ?? '');
 $toInput = trim($_GET['to'] ?? '');
@@ -74,17 +92,54 @@ if ($searchTerm !== '' || $fromTimestamp || $toTimestamp) {
     }));
 }
 
-$average = function ($field) use ($selectedLogs) {
+$average = function ($field, array $rows) {
+    $limits = [
+        'temp' => [-40, 85],
+        'hum' => [0, 100]
+    ];
     $values = array_map(function ($log) use ($field) {
-        return (float) ($log[$field] ?? 0);
-    }, $selectedLogs);
-    return count($values) ? array_sum($values) / count($values) : 0;
+        $value = $log[$field] ?? null;
+        if (!is_numeric($value) || !is_finite((float) $value)) {
+            return null;
+        }
+        return (float) $value;
+    }, $rows);
+    $values = array_values(array_filter($values, function ($value) {
+        return $value !== null;
+    }));
+    if (isset($limits[$field])) {
+        $values = array_values(array_filter($values, function ($value) use ($limits, $field) {
+            return $value >= $limits[$field][0] && $value <= $limits[$field][1];
+        }));
+    }
+    return count($values) ? array_sum($values) / count($values) : null;
 };
 
-$maxPm25 = 0;
-foreach ($selectedLogs as $log) {
-    $maxPm25 = max($maxPm25, (float) ($log['pm25'] ?? 0));
-}
+$validPm25 = function (array $rows) {
+    $values = [];
+    foreach ($rows as $row) {
+        $value = $row['pm25'] ?? null;
+        if (is_numeric($value) && is_finite((float) $value) && (float) $value >= 0 && (float) $value <= 1000) {
+            $values[] = (float) $value;
+        }
+    }
+    return $values;
+};
+
+$dailyPm25 = $validPm25($dailyLogs);
+$previousPm25 = $validPm25($previousDayLogs);
+$averageTemp = $average('temp', $dailyLogs);
+$averageHumidity = $average('hum', $dailyLogs);
+$maxPm25 = $dailyPm25 ? max($dailyPm25) : null;
+$dailyHighReadings = array_values(array_filter($dailyLogs, function ($log) {
+    return in_array(classifyPm25($log['pm25'] ?? null)['level'], ['UNHEALTHY', 'HAZARDOUS'], true);
+}));
+usort($dailyHighReadings, function ($a, $b) {
+    return strcmp($a['timestamp'] ?? '', $b['timestamp'] ?? '');
+});
+$averageDelta = $dailyPm25 && $previousPm25
+    ? array_sum($dailyPm25) / count($dailyPm25) - array_sum($previousPm25) / count($previousPm25)
+    : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -93,6 +148,7 @@ foreach ($selectedLogs as $log) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sensor Reports | City Airshed</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="air_quality.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -123,7 +179,9 @@ foreach ($selectedLogs as $log) {
         select, input { border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); padding: 9px 10px; font: inherit; }
         .search-btn { border: 0; border-radius: 8px; padding: 10px 14px; background: var(--blue); color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
         .clear-search { color: var(--muted); font-size: 12px; font-weight: 700; text-decoration: none; }
-        .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+        .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .alert-summary { margin: -8px 0 24px; padding: 16px 20px; border: 1px solid #f0c98e; border-radius: 14px; background: #fff9ee; color: #68460d; line-height: 1.6; }
+        .alert-summary.clear { border-color: #b8e4ce; background: #effaf4; color: #176345; }
         .metric, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 14px 30px rgba(36,104,157,.14), 0 3px 0 rgba(255,255,255,.9) inset; animation: cardRise .6s ease both, cardFloat 5.5s ease-in-out .7s infinite; }
         .metric { padding: 20px; transition: transform .25s ease, box-shadow .25s ease; }
         .metric:hover, .panel:hover { transform: translateY(-6px); box-shadow: 0 18px 30px rgba(45,112,164,.22); }
@@ -363,17 +421,32 @@ foreach ($selectedLogs as $log) {
             <div class="error"><?php echo htmlspecialchars($error); ?></div>
         <?php else: ?>
             <section class="summary">
-                <div class="metric"><span class="metric-label">Readings</span><strong class="metric-value"><?php echo count($selectedLogs); ?></strong></div>
-                <div class="metric"><span class="metric-label">Average Temp</span><strong class="metric-value"><?php echo number_format($average('temp'), 1); ?> C</strong></div>
-                <div class="metric"><span class="metric-label">Average Humidity</span><strong class="metric-value"><?php echo number_format($average('hum'), 1); ?>%</strong></div>
-                <div class="metric"><span class="metric-label">Peak PM2.5</span><strong class="metric-value"><?php echo number_format($maxPm25, 1); ?></strong></div>
+                <div class="metric"><span class="metric-label">Valid PM2.5 readings</span><strong class="metric-value"><?php echo count($dailyPm25); ?> / <?php echo count($dailyLogs); ?></strong></div>
+                <div class="metric"><span class="metric-label">Daily average PM2.5</span><strong class="metric-value"><?php echo $dailyPm25 ? number_format(array_sum($dailyPm25) / count($dailyPm25), 1) . ' µg/m³' : '--'; ?></strong></div>
+                <div class="metric"><span class="metric-label">Change vs previous day</span><strong class="metric-value"><?php echo $averageDelta === null ? '--' : (($averageDelta > 0 ? '+' : '') . number_format($averageDelta, 1) . ' µg/m³'); ?></strong></div>
+                <div class="metric"><span class="metric-label">Peak PM2.5</span><strong class="metric-value"><?php echo $maxPm25 === null ? '--' : number_format($maxPm25, 1) . ' µg/m³'; ?></strong></div>
+                <div class="metric"><span class="metric-label">Average temperature</span><strong class="metric-value"><?php echo $averageTemp === null ? '--' : number_format($averageTemp, 1) . ' °C'; ?></strong></div>
+                <div class="metric"><span class="metric-label">Average humidity</span><strong class="metric-value"><?php echo $averageHumidity === null ? '--' : number_format($averageHumidity, 1) . '%'; ?></strong></div>
+            </section>
+
+            <section class="alert-summary<?php echo $dailyHighReadings ? '' : ' clear'; ?>" aria-live="polite">
+                <?php if ($dailyHighReadings): ?>
+                    <?php $firstHighReading = $dailyHighReadings[0]; $latestHighReading = $dailyHighReadings[count($dailyHighReadings) - 1]; ?>
+                    <strong><?php echo count($dailyHighReadings); ?> unhealthy or hazardous PM2.5 readings on this date.</strong>
+                    First high reading: <?php echo date('h:i A', strtotime($firstHighReading['timestamp'])); ?>
+                    (<?php echo number_format((float) $firstHighReading['pm25'], 1); ?> µg/m³); latest:
+                    <?php echo date('h:i A', strtotime($latestHighReading['timestamp'])); ?>
+                    (<?php echo number_format((float) $latestHighReading['pm25'], 1); ?> µg/m³).
+                <?php else: ?>
+                    No unhealthy or hazardous PM2.5 readings were recorded for this day.
+                <?php endif; ?>
             </section>
 
             <section class="panel chart-panel">
                 <div class="panel-head" style="padding: 0 0 18px; border-bottom: 0;">
                     <div>
                         <h2>Daily Air Quality Trend</h2>
-                        <span>Temperature, humidity, PM2.5, and MQ gas readings</span>
+                        <span>Device readings by timestamp. MQ readings are raw ADC, not calibrated CO ppm.</span>
                     </div>
                 </div>
                 <div class="chart-scroll"><div class="chart-wrap"><canvas id="dailyChart"></canvas></div></div>
@@ -392,16 +465,17 @@ foreach ($selectedLogs as $log) {
                 <?php else: ?>
                     <div class="table-wrap">
                         <table>
-                            <thead><tr><th>Time</th><th>Temperature</th><th>Humidity</th><th>PM2.5</th><th>MQ Gas</th><th>Status</th></tr></thead>
+                            <thead><tr><th>Time</th><th>Temperature</th><th>Humidity</th><th>PM2.5</th><th>MQ Gas (raw ADC)</th><th>PM2.5 classification</th></tr></thead>
                             <tbody>
                             <?php foreach ($selectedLogs as $log): ?>
                                 <tr>
                                     <td><?php echo date('h:i:s A', strtotime($log['timestamp'] ?? '')); ?></td>
-                                    <td><?php echo number_format((float) ($log['temp'] ?? 0), 1); ?> C</td>
-                                    <td><?php echo number_format((float) ($log['hum'] ?? 0), 1); ?>%</td>
-                                    <td><?php echo number_format((float) ($log['pm25'] ?? 0), 1); ?> ug/m3</td>
-                                    <td><?php echo number_format((float) ($log['co'] ?? 0), 1); ?> raw ADC</td>
-                                    <td><span class="status"><?php echo htmlspecialchars($log['status'] ?? 'UNKNOWN'); ?></span></td>
+                                    <td><?php echo is_numeric($log['temp'] ?? null) && (float) $log['temp'] >= -40 && (float) $log['temp'] <= 85 ? number_format((float) $log['temp'], 1) : '--'; ?> C</td>
+                                    <td><?php echo is_numeric($log['hum'] ?? null) && (float) $log['hum'] >= 0 && (float) $log['hum'] <= 100 ? number_format((float) $log['hum'], 1) : '--'; ?>%</td>
+                                    <td><?php echo is_numeric($log['pm25'] ?? null) && (float) $log['pm25'] >= 0 && (float) $log['pm25'] <= 1000 ? number_format((float) $log['pm25'], 1) : '--'; ?> µg/m³</td>
+                                    <td><?php echo is_numeric($log['co'] ?? null) && (float) $log['co'] >= 0 && (float) $log['co'] <= 4095 ? number_format((float) $log['co'], 1) : '--'; ?> raw ADC</td>
+                                    <?php $pmCategory = classifyPm25($log['pm25'] ?? null); ?>
+                                    <td><span class="status" style="color:<?php echo htmlspecialchars($pmCategory['color'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>;"><?php echo htmlspecialchars($pmCategory['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -484,26 +558,51 @@ foreach ($selectedLogs as $log) {
             if (event.key === 'Escape') closeMobileSidebar();
         });
 
-        const reportRows = <?php echo json_encode(array_values($selectedLogs), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
-        const chartLabels = reportRows.map(row => new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const reportRows = <?php echo json_encode(array_values($selectedLogs), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+        const chartRows = reportRows.slice().reverse();
+        const chartLabels = chartRows.map(row => new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         const chartCanvas = document.getElementById('dailyChart');
         if (chartCanvas) new Chart(chartCanvas, {
             type: 'line',
             data: {
                 labels: chartLabels,
                 datasets: [
-                    { label: 'PM2.5', data: reportRows.map(row => Number(row.pm25 || 0)), borderColor: '#174ea6', backgroundColor: 'rgba(23,78,166,.12)', fill: true, tension: .35, yAxisID: 'air' },
-                    { label: 'Temperature', data: reportRows.map(row => Number(row.temp || 0)), borderColor: '#e76f51', tension: .35, yAxisID: 'weather' },
-                    { label: 'Humidity', data: reportRows.map(row => Number(row.hum || 0)), borderColor: '#00a896', tension: .35, yAxisID: 'humidity' },
-                    { label: 'Gas/MQ', data: reportRows.map(row => Number(row.co || 0)), borderColor: '#8e44ad', tension: .35, yAxisID: 'gas' }
+                    {
+                        label: 'PM2.5',
+                        data: chartRows.map(row => {
+                            if (row.pm25 === null || row.pm25 === undefined) return null;
+                            const value = Number(row.pm25);
+                            return Number.isFinite(value) && value >= 0 && value <= 1000 ? value : null;
+                        }),
+                        borderColor: '#168a68',
+                        backgroundColor: 'rgba(22,138,104,.12)',
+                        fill: true,
+                        tension: .35,
+                        yAxisID: 'air',
+                        pointBackgroundColor: context => AirshedAirQuality.classifyPm25(context.raw).color,
+                        pointBorderColor: context => AirshedAirQuality.classifyPm25(context.raw).color,
+                        segment: { borderColor: context => AirshedAirQuality.classifyPm25(context.p1.raw).color }
+                    },
+                    { label: 'Temperature', data: chartRows.map(row => {
+                        const value = row.temp === null || row.temp === undefined ? NaN : Number(row.temp);
+                        return Number.isFinite(value) && value >= -40 && value <= 85 ? value : null;
+                    }), borderColor: '#e76f51', tension: .35, yAxisID: 'weather' },
+                    { label: 'Humidity', data: chartRows.map(row => {
+                        const value = row.hum === null || row.hum === undefined ? NaN : Number(row.hum);
+                        return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+                    }), borderColor: '#00a896', tension: .35, yAxisID: 'humidity' },
+                    { label: 'MQ Gas (raw ADC)', data: chartRows.map(row => {
+                        const value = row.co === null || row.co === undefined ? NaN : Number(row.co);
+                        return Number.isFinite(value) && value >= 0 && value <= 4095 ? value : null;
+                    }), borderColor: '#8e44ad', tension: .35, yAxisID: 'gas' }
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { air: { beginAtZero: true, position: 'left' }, weather: { beginAtZero: false, position: 'right', grid: { drawOnChartArea: false } }, humidity: { beginAtZero: true, position: 'left', display: false }, gas: { beginAtZero: true, position: 'right', display: false } } }
         });
 
         function exportReport() {
-            const header = ['Timestamp', 'Temperature', 'Humidity', 'PM2.5', 'CO', 'Status'];
-            const rows = reportRows.map(row => [row.timestamp, row.temp, row.hum, row.pm25, row.co, row.status]);
+            const header = ['Timestamp', 'Temperature', 'Humidity', 'PM2.5', 'MQ Gas (raw ADC)', 'PM2.5 Classification'];
+            const rows = reportRows.map(row => [row.timestamp, row.temp, row.hum, row.pm25, row.co, AirshedAirQuality.classifyPm25(row.pm25).label]);
             const csv = [header, ...rows].map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');

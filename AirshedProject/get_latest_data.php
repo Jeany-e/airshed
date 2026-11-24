@@ -1,126 +1,137 @@
 <?php
 require __DIR__ . '/config.php';
+require __DIR__ . '/forecast_helpers.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
 try {
-    $records = array_values(array_filter(firebaseRows('sensor_logs'), function ($record) {
-        $pm25 = $record['pm25'] ?? $record['pm2_5'] ?? $record['pm2.5'] ?? null;
-        return ($record['source'] ?? '') === 'device'
-            && is_numeric($pm25)
-            && (float) $pm25 >= 0
-            && (float) $pm25 <= 1000;
-    }));
-    foreach ($records as &$record) {
-        $record['pm25'] = $record['pm25'] ?? $record['pm2_5'] ?? $record['pm2.5'];
-    }
-    unset($record);
-    usort($records, function ($a, $b) {
-        return strcmp($a['timestamp'] ?? '', $b['timestamp'] ?? '');
-    });
-    $history = array_slice($records, -15);
-    $latestLocation = $history ? end($history) : [];
-    $latest = $history ? end($history) : null;
-    $latestTimestamp = strtotime($latest['timestamp'] ?? '');
-    $latestIsFresh = $latestTimestamp && (time() - $latestTimestamp <= 45);
-
-    $calculateForecast = function (array $records, string $key, int $horizonMinutes) {
-        $points = [];
-        foreach ($records as $record) {
-            $timestamp = strtotime($record['timestamp'] ?? '');
-            $value = $key === 'temp'
-                ? ($record['temp'] ?? $record['temperature'] ?? null)
-                : ($key === 'hum'
-                    ? ($record['hum'] ?? $record['humidity'] ?? null)
-                    : ($record[$key] ?? null));
-            if (!$timestamp || $value === null || !is_numeric($value)) continue;
-            $value = (float) $value;
-            if ($value < 0) continue;
-            $points[] = ['time' => $timestamp, 'value' => $value];
+    $cutoff = time() - 30 * 24 * 60 * 60;
+    $records = [];
+    foreach (firebaseRows('sensor_logs') as $record) {
+        if (($record['source'] ?? '') !== 'device') {
+            continue;
         }
 
-        if (count($points) < 5) return null;
-
-        $origin = $points[0]['time'];
-        $sumWeight = $sumX = $sumY = $sumXY = $sumX2 = 0.0;
-        $values = [];
-        $count = count($points);
-        foreach ($points as $index => $point) {
-            $x = ($point['time'] - $origin) / 60.0;
-            $y = $point['value'];
-            $values[] = $y;
-            $weight = 0.5 + 1.5 * ($index / max(1, $count - 1));
-            $sumWeight += $weight;
-            $sumX += $weight * $x;
-            $sumY += $weight * $y;
-            $sumXY += $weight * $x * $y;
-            $sumX2 += $weight * $x * $x;
+        $timestamp = strtotime($record['timestamp'] ?? '');
+        if (!$timestamp || $timestamp < $cutoff) {
+            continue;
         }
 
-        $denominator = ($sumWeight * $sumX2) - ($sumX * $sumX);
-        if (abs($denominator) < 0.000001) return null;
-
-        $slope = (($sumWeight * $sumXY) - ($sumX * $sumY)) / $denominator;
-        $intercept = (($sumY - ($slope * $sumX)) / $sumWeight);
-        $latest = $points[$count - 1];
-        $latestX = ($latest['time'] - $origin) / 60.0;
-        $projected = $intercept + ($slope * ($latestX + $horizonMinutes));
-
-        $residualSquared = 0.0;
-        foreach ($points as $index => $point) {
-            $x = ($point['time'] - $origin) / 60.0;
-            $weight = 0.5 + 1.5 * ($index / max(1, $count - 1));
-            $expected = $intercept + ($slope * $x);
-            $residualSquared += $weight * pow($point['value'] - $expected, 2);
-        }
-        $rmse = sqrt($residualSquared / $sumWeight);
-        $baseline = max(10.0, abs($latest['value']) * 0.25);
-        $confidence = 1.0 - min(1.0, $rmse / $baseline);
-
-        $horizonFactor = $horizonMinutes <= 30 ? 0.85 : 0.35;
-        $dampedTrend = ($projected - $latest['value']) * $horizonFactor * (0.45 + (0.55 * $confidence));
-        $forecast = $latest['value'] + $dampedTrend;
-
-        $observedMin = min($values);
-        $observedMax = max($values);
-        $allowedRange = max(10.0, ($observedMax - $observedMin) * 1.5);
-        $forecast = max($observedMin - $allowedRange, min($observedMax + $allowedRange, $forecast));
-        $forecast = max(0.0, $forecast);
-
-        return round($forecast, 1);
-    };
-
-    $forecast30 = $calculateForecast($history, 'pm25', 30);
-    $forecast2h = $calculateForecast($history, 'pm25', 120);
-    $forecastTemp = $calculateForecast($history, 'temp', 30);
-    $forecastHum = $calculateForecast($history, 'hum', 30);
-
-    $predictionHistory = array_map(function ($record) {
-        return [
-            'temp' => (float) ($record['temp'] ?? $record['temperature'] ?? 0),
-            'hum' => (float) ($record['hum'] ?? $record['humidity'] ?? 0),
-            'pm25' => (float) ($record['pm25'] ?? 0),
-            'co' => (float) ($record['co'] ?? $record['co_ppm'] ?? 0),
-            'timestamp' => $record['timestamp'] ?? null
+        $normalize = function ($value, $minimum, $maximum) {
+            if (!is_numeric($value)) {
+                return null;
+            }
+            $number = (float) $value;
+            return is_finite($number) && $number >= $minimum && $number <= $maximum ? $number : null;
+        };
+        $normalized = [
+            'timestamp' => $record['timestamp'],
+            'timestamp_unix' => $timestamp,
+            'temp' => $normalize($record['temp'] ?? $record['temperature'] ?? null, -40, 85),
+            'hum' => $normalize($record['hum'] ?? $record['humidity'] ?? null, 0, 100),
+            'pm25' => $normalize($record['pm25'] ?? $record['pm2_5'] ?? $record['pm2.5'] ?? null, 0, 1000),
+            'co' => $normalize($record['co'] ?? $record['mq_adc'] ?? $record['co_ppm'] ?? null, 0, 4095),
+            'battery' => $record['battery'] ?? null,
+            'latitude' => $normalize($record['latitude'] ?? null, -90, 90),
+            'longitude' => $normalize($record['longitude'] ?? null, -180, 180),
+            'status' => $record['status'] ?? null
         ];
-    }, $history);
+        if ($normalized['temp'] !== null || $normalized['hum'] !== null || $normalized['pm25'] !== null) {
+            $records[] = $normalized;
+        }
+    }
 
-    echo json_encode([
-        'live' => (bool) $latestIsFresh,
-        'temp' => $latestIsFresh ? (float) ($latest['temp'] ?? $latest['temperature'] ?? 0) : null,
-        'hum' => $latestIsFresh ? (float) ($latest['hum'] ?? $latest['humidity'] ?? 0) : null,
-        'pm25' => $latestIsFresh ? (float) ($latest['pm25'] ?? 0) : null,
-        'co' => $latestIsFresh ? (float) ($latest['co'] ?? $latest['co_ppm'] ?? 0) : null,
-        'status' => $latestIsFresh ? ($latest['status'] ?? 'UNKNOWN') : 'OFFLINE',
-        'latitude' => isset($latestLocation['latitude']) ? (float) $latestLocation['latitude'] : null,
-        'longitude' => isset($latestLocation['longitude']) ? (float) $latestLocation['longitude'] : null,
+    usort($records, function ($a, $b) {
+        return $a['timestamp_unix'] <=> $b['timestamp_unix'];
+    });
+    $records = array_slice($records, -5000);
+    $latest = $records ? $records[count($records) - 1] : null;
+    $latestAge = $latest ? time() - $latest['timestamp_unix'] : null;
+    $live = $latestAge !== null && $latestAge >= -30 && $latestAge <= 45;
+    $history = array_map(function ($record) {
+        return [
+            'timestamp' => $record['timestamp'],
+            'temp' => $record['temp'],
+            'hum' => $record['hum'],
+            'pm25' => $record['pm25'],
+            'co' => $record['co']
+        ];
+    }, array_slice($records, -15));
+
+    $forecastFields = [
+        'pm25' => ['minimum' => 0, 'maximum' => 1000],
+        'temp' => ['minimum' => -40, 'maximum' => 85],
+        'hum' => ['minimum' => 0, 'maximum' => 100]
+    ];
+    $fieldHistory = [];
+    foreach ($forecastFields as $field => $limits) {
+        $fieldHistory[$field] = array_values(array_filter($records, function ($record) use ($field) {
+            return $record[$field] !== null;
+        }));
+    }
+
+    $forecast30 = calculateValidatedForecast($fieldHistory['pm25'], 'pm25', 30 * 60, 0, 1000);
+    $forecast2h = calculateValidatedForecast($fieldHistory['pm25'], 'pm25', 2 * 60 * 60, 0, 1000);
+    $forecastTemp = calculateValidatedForecast($fieldHistory['temp'], 'temp', 30 * 60, -40, 85);
+    $forecastHum = calculateValidatedForecast($fieldHistory['hum'], 'hum', 30 * 60, 0, 100);
+    $forecastResults = [
         'forecast30' => $forecast30,
         'forecast2h' => $forecast2h,
         'forecast_temp' => $forecastTemp,
-        'forecast_hum' => $forecastHum,
-        'prediction_history' => $predictionHistory
-    ]);
+        'forecast_hum' => $forecastHum
+    ];
+
+    $forecastFieldKeys = [
+        'forecast30' => 'pm25',
+        'forecast2h' => 'pm25',
+        'forecast_temp' => 'temp',
+        'forecast_hum' => 'hum'
+    ];
+    foreach ($forecastFieldKeys as $forecastKey => $field) {
+        if (!$live || ($latest[$field] ?? null) === null) {
+            $forecastResults[$forecastKey]['value'] = null;
+            $forecastResults[$forecastKey]['metrics']['available'] = false;
+            $forecastResults[$forecastKey]['metrics']['reason'] = !$live
+                ? 'The sensor is offline; estimates are paused.'
+                : 'No current valid ' . strtoupper($field) . ' reading; estimates are paused.';
+        }
+    }
+    $forecast30 = $forecastResults['forecast30'];
+    $forecast2h = $forecastResults['forecast2h'];
+    $forecastTemp = $forecastResults['forecast_temp'];
+    $forecastHum = $forecastResults['forecast_hum'];
+
+    $pmClassification = classifyPm25($latest['pm25'] ?? null);
+    echo json_encode([
+        'live' => $live,
+        'temp' => $live ? $latest['temp'] : null,
+        'hum' => $live ? $latest['hum'] : null,
+        'pm25' => $live ? $latest['pm25'] : null,
+        'co' => $live ? $latest['co'] : null,
+        'battery' => $live ? $latest['battery'] : null,
+        'status' => $live ? $pmClassification['label'] : 'OFFLINE',
+        'pm25_status' => $live ? $pmClassification['level'] : 'UNKNOWN',
+        'latitude' => $latest['latitude'] ?? null,
+        'longitude' => $latest['longitude'] ?? null,
+        'prediction_history' => $history,
+        'forecast30' => $forecast30['value'] ?? null,
+        'forecast2h' => $forecast2h['value'] ?? null,
+        'forecast_temp' => $forecastTemp['value'] ?? null,
+        'forecast_hum' => $forecastHum['value'] ?? null,
+        'forecast_metrics' => [
+            'forecast30' => $forecast30['metrics'],
+            'forecast2h' => $forecast2h['metrics'],
+            'forecast_temp' => $forecastTemp['metrics'],
+            'forecast_hum' => $forecastHum['metrics']
+        ],
+        'forecast_basis' => [
+            'pm25_30m' => $forecast30['basis'],
+            'pm25_2h' => $forecast2h['basis'],
+            'temp' => $forecastTemp['basis'],
+            'hum' => $forecastHum['basis']
+        ]
+    ], JSON_INVALID_UTF8_SUBSTITUTE);
 } catch (Throwable $error) {
     http_response_code(503);
     echo json_encode(['error' => 'Firebase sensor data is unavailable']);

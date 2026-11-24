@@ -69,6 +69,36 @@ function firebaseRows($path) {
     return $rows;
 }
 
+function classifyPm25($value) {
+    if ($value === null || $value === '' || !is_numeric($value)) {
+        return [
+            'level' => 'UNKNOWN',
+            'label' => 'Unknown',
+            'color' => '#64748b'
+        ];
+    }
+
+    $value = (float) $value;
+    if (!is_finite($value) || $value < 0 || $value > 1000) {
+        return [
+            'level' => 'INVALID',
+            'label' => 'Invalid',
+            'color' => '#64748b'
+        ];
+    }
+
+    if ($value <= 12) {
+        return ['level' => 'GOOD', 'label' => 'Good', 'color' => '#168a68'];
+    }
+    if ($value <= 35) {
+        return ['level' => 'MODERATE', 'label' => 'Moderate', 'color' => '#d88a18'];
+    }
+    if ($value <= 150) {
+        return ['level' => 'UNHEALTHY', 'label' => 'Unhealthy', 'color' => '#ed6c02'];
+    }
+    return ['level' => 'HAZARDOUS', 'label' => 'Hazardous', 'color' => '#c43d4b'];
+}
+
 function logActivity($action, $userId = null, $username = null, $role = null) {
     try {
         firebasePush('activity_logs', [
