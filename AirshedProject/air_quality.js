@@ -24,38 +24,37 @@
 
     function forecastSummary(metrics, basis) {
         if (!metrics || metrics.available !== true) {
-            return `No validated estimate: ${(metrics && metrics.reason) || 'not enough reliable history.'}`;
+            return `No estimate yet. ${(metrics && metrics.reason) || 'More recent readings are needed.'}`;
         }
 
+        const backtests = Number(metrics.backtest_samples);
+        const mae = Number(metrics.mae);
+        const unit = metrics.unit || 'units';
+        const errorText = Number.isFinite(backtests) && Number.isFinite(mae)
+            ? ` In ${backtests} past checks, it was off by about ${mae.toFixed(1)} ${unit} on average.`
+            : '';
+
         if (metrics.method === 'baseline') {
-            const backtests = Number(metrics.backtest_samples);
-            const mae = Number(metrics.mae);
-            const unit = metrics.unit || 'units';
-            const validationText = Number.isFinite(backtests) && Number.isFinite(mae)
-                ? ` Back-tested on ${backtests} cases: baseline MAE ${mae.toFixed(1)} ${unit}.`
-                : '';
-            return `Using the latest reading as a persistence estimate because the trend did not beat the baseline by at least 3%.${validationText}`;
+            return `Recent readings did not show a reliable trend, so this estimate uses the latest reading.${errorText}`;
         }
 
         const samples = Number(basis && basis.sample_count);
         const spanMinutes = Number(basis && basis.span_minutes);
-        const backtests = Number(metrics.backtest_samples);
-        const mae = Number(metrics.mae);
-        const baselineMae = Number(metrics.baseline_mae);
         const basisText = Number.isFinite(samples) && Number.isFinite(spanMinutes)
-            ? `Estimate based on ${samples} recent readings over ${spanMinutes.toFixed(0)} minutes.`
-            : 'Estimate based on recent device readings.';
+            ? `Estimate uses ${samples} recent readings from the past ${spanMinutes.toFixed(0)} minutes.`
+            : 'Estimate uses recent readings.';
 
-        if (!Number.isFinite(backtests) || !Number.isFinite(mae) || !Number.isFinite(baselineMae)) {
-            return `${basisText} Historical validation details are unavailable.`;
+        if (!Number.isFinite(backtests) || !Number.isFinite(mae)) {
+            return `${basisText} Past accuracy information is not available yet.`;
         }
 
-        const unit = metrics.unit || 'units';
         const accuracy = Number(metrics.accuracy_pct);
-        const accuracyText = Number.isFinite(accuracy)
-            ? ` Error improved ${accuracy.toFixed(1)}% over the baseline.`
+        const comparisonText = Number.isFinite(accuracy)
+            ? accuracy > 0
+                ? ` It was ${accuracy.toFixed(1)}% more accurate than using the latest reading alone.`
+                : ' It was about as accurate as using the latest reading alone.'
             : '';
-        return `${basisText} Back-tested on ${backtests} cases: MAE ${mae.toFixed(1)} ${unit} vs ${baselineMae.toFixed(1)} ${unit} for a last-reading baseline.${accuracyText}`;
+        return `${basisText}${errorText}${comparisonText}`;
     }
 
     function escapeHtml(value) {

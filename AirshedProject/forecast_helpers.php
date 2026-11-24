@@ -129,7 +129,7 @@ function calculateValidatedForecast(array $rows, $field, $horizonSeconds, $minim
     ];
 
     if ($backtestCount < 10) {
-        $metrics['reason'] = 'Only ' . $backtestCount . ' historical comparisons; at least 10 are required.';
+        $metrics['reason'] = 'More past readings are needed to check this estimate.';
     } else {
         $mae = array_sum($predictionErrors) / $backtestCount;
         $baselineMae = array_sum($baselineErrors) / $backtestCount;
@@ -155,8 +155,8 @@ function calculateValidatedForecast(array $rows, $field, $horizonSeconds, $minim
             $forecastValue = (float) $latestValue;
         } else {
             $metrics['reason'] = $latestFit === null
-                ? 'Not enough recent readings across five minutes to calculate a stable trend.'
-                : 'The trend model did not beat the last-reading baseline by at least 3%.';
+                ? 'Not enough recent readings to make a reliable estimate yet.'
+                : 'Recent patterns were not accurate enough to forecast a change.';
         }
     }
 
