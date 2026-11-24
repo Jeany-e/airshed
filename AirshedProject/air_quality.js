@@ -27,6 +27,16 @@
             return `No validated estimate: ${(metrics && metrics.reason) || 'not enough reliable history.'}`;
         }
 
+        if (metrics.method === 'baseline') {
+            const backtests = Number(metrics.backtest_samples);
+            const mae = Number(metrics.mae);
+            const unit = metrics.unit || 'units';
+            const validationText = Number.isFinite(backtests) && Number.isFinite(mae)
+                ? ` Back-tested on ${backtests} cases: baseline MAE ${mae.toFixed(1)} ${unit}.`
+                : '';
+            return `Using the latest reading as a persistence estimate because the trend did not beat the baseline by at least 3%.${validationText}`;
+        }
+
         const samples = Number(basis && basis.sample_count);
         const spanMinutes = Number(basis && basis.span_minutes);
         const backtests = Number(metrics.backtest_samples);

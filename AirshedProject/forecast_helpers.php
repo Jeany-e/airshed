@@ -107,6 +107,12 @@ function calculateValidatedForecast(array $rows, $field, $horizonSeconds, $minim
     }
 
     $latestFit = $rows ? $fit(count($rows) - 1) : null;
+    $latestValue = $rows ? ($rows[count($rows) - 1][$field] ?? null) : null;
+    $latestValueIsValid = is_numeric($latestValue)
+        && is_finite((float) $latestValue)
+        && (float) $latestValue >= $minimum
+        && (float) $latestValue <= $maximum;
+    $forecastValue = null;
     $backtestCount = count($predictionErrors);
     $metrics = [
         'available' => false,
@@ -133,17 +139,29 @@ function calculateValidatedForecast(array $rows, $field, $horizonSeconds, $minim
             ? round(max(0, (1 - ($mae / $baselineMae)) * 100), 1)
             : null;
 
-        if ($baselineMae <= 0 || $mae >= $baselineMae * 0.95) {
-            $metrics['reason'] = 'The trend model did not beat the last-reading baseline by at least 5%.';
-        } elseif ($latestFit === null) {
-            $metrics['reason'] = 'Not enough recent readings across five minutes to calculate a stable trend.';
-        } else {
+        $trendPassesValidation = $baselineMae > 0 && $mae <= $baselineMae * 0.97;
+        if ($trendPassesValidation && $latestFit !== null) {
             $metrics['available'] = true;
+            $metrics['method'] = 'trend';
+            $forecastValue = $latestFit['value'];
+        } elseif ($latestValueIsValid) {
+            $metrics['available'] = true;
+            $metrics['method'] = 'baseline';
+            $metrics['mae'] = round($baselineMae, 2);
+            $metrics['accuracy_pct'] = 0;
+            $metrics['reason'] = $latestFit === null
+                ? 'Not enough recent readings for a stable trend; using the latest reading as a baseline estimate.'
+                : 'The trend model did not beat the last-reading baseline by at least 3%; using the baseline estimate.';
+            $forecastValue = (float) $latestValue;
+        } else {
+            $metrics['reason'] = $latestFit === null
+                ? 'Not enough recent readings across five minutes to calculate a stable trend.'
+                : 'The trend model did not beat the last-reading baseline by at least 3%.';
         }
     }
 
     return [
-        'value' => $metrics['available'] ? round($latestFit['value'], 2) : null,
+        'value' => $metrics['available'] ? round($forecastValue, 2) : null,
         'metrics' => $metrics,
         'basis' => $basis
     ];
