@@ -55,11 +55,33 @@ $feedback_average = $feedback_count
     ? round(array_sum(array_map(function ($feedback) { return (int) ($feedback['rating'] ?? 0); }, $feedback_rows)) / $feedback_count, 1)
     : 0;
 $feedback_rows = array_slice($feedback_rows, 0, 20);
-$alert_delivery_logs = firebaseRows('alert_delivery_logs');
+$alert_delivery_logs = firebaseRows('alert_delivery_logs', [
+    'orderBy' => '"timestamp"',
+    'limitToLast' => 50
+]);
 usort($alert_delivery_logs, function ($a, $b) {
     return strcmp($b['timestamp'] ?? '', $a['timestamp'] ?? '');
 });
-$alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
+$alert_event_logs = firebaseRows('alert_logs', [
+    'orderBy' => '"timestamp"',
+    'limitToLast' => 50
+]);
+usort($alert_event_logs, function ($a, $b) {
+    return strcmp($b['timestamp'] ?? '', $a['timestamp'] ?? '');
+});
+
+$historicalAlertEvents = [];
+$historicalAlertError = false;
+try {
+    $historicalSensorLogs = firebaseRows('sensor_logs', [
+        'orderBy' => '"timestamp"',
+        'limitToLast' => 5000
+    ]);
+    $historicalAlertEvents = buildHistoricalPm25Events($historicalSensorLogs);
+} catch (Throwable $error) {
+    error_log('Historical air-quality events unavailable: ' . $error->getMessage());
+    $historicalAlertError = true;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -861,6 +883,52 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                                     <td><?php echo number_format((float) ($alert['pm25'] ?? 0), 1); ?> µg/m³</td>
                                     <td style="color:#2e7d32; font-weight:800;"><?php echo htmlspecialchars($alert['status'] ?? 'Sent'); ?></td>
                                     <td><?php echo date('M d, Y g:i A', strtotime($alert['timestamp'] ?? '')); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table></div>
+                <?php endif; ?>
+            </div>
+            <div class="table-container" style="border-top: 5px solid var(--accent);">
+                <h3 style="color: var(--primary); margin-top: 0;">Recorded Alert Events</h3>
+                <p style="color:#7f8c8d; font-size:13px;">Events logged after an alert was successfully sent.</p>
+                <?php if (!$alert_event_logs): ?>
+                    <p style="color:#7f8c8d;">No sent alert events have been recorded.</p>
+                <?php else: ?>
+                    <div class="table-scroll"><table>
+                        <thead><tr><th>PM2.5</th><th>Classification</th><th>Recipients</th><th>Date Sent</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($alert_event_logs as $alertEvent): ?>
+                                <?php $alertClassification = classifyPm25($alertEvent['pm25'] ?? null); ?>
+                                <tr>
+                                    <td><?php echo is_numeric($alertEvent['pm25'] ?? null) ? number_format((float) $alertEvent['pm25'], 1) : '--'; ?> µg/m³</td>
+                                    <td><?php echo $escapeHtml($alertClassification['label']); ?></td>
+                                    <td><?php echo (int) ($alertEvent['recipient_count'] ?? 0); ?></td>
+                                    <td><?php echo $escapeHtml(date('M d, Y g:i A', strtotime($alertEvent['timestamp'] ?? '') ?: 0)); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table></div>
+                <?php endif; ?>
+            </div>
+            <div class="table-container" style="border-top: 5px solid var(--accent);">
+                <h3 style="color: var(--primary); margin-top: 0;">Historical High PM2.5 Events</h3>
+                <p style="color:#7f8c8d; font-size:13px;">Reconstructed from up to 5,000 recent device readings. These are real sensor events, not records of emails sent.</p>
+                <?php if ($historicalAlertError): ?>
+                    <p style="color:#b42318;">Historical sensor readings are temporarily unavailable.</p>
+                <?php elseif (!$historicalAlertEvents): ?>
+                    <p style="color:#7f8c8d;">No unhealthy or hazardous PM2.5 readings were found in the loaded sensor history.</p>
+                <?php else: ?>
+                    <div class="table-scroll"><table>
+                        <thead><tr><th>First Reading</th><th>Last Reading</th><th>Peak PM2.5</th><th>Classification</th><th>Readings</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($historicalAlertEvents as $event): ?>
+                                <tr>
+                                    <td><?php echo $escapeHtml(date('M d, Y g:i A', strtotime($event['first_timestamp']))); ?></td>
+                                    <td><?php echo $escapeHtml(date('M d, Y g:i A', strtotime($event['last_timestamp']))); ?></td>
+                                    <td><?php echo number_format($event['peak_pm25'], 1); ?> µg/m³</td>
+                                    <td><?php echo $escapeHtml($event['peak_classification']); ?></td>
+                                    <td><?php echo (int) $event['reading_count']; ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

@@ -100,6 +100,65 @@ function classifyPm25($value) {
     return ['level' => 'HAZARDOUS', 'label' => 'Hazardous', 'color' => '#c43d4b'];
 }
 
+function buildHistoricalPm25Events(array $readings) {
+    usort($readings, function ($a, $b) {
+        return (strtotime($a['timestamp'] ?? '') ?: 0) <=> (strtotime($b['timestamp'] ?? '') ?: 0);
+    });
+
+    $events = [];
+    $currentEvent = null;
+    foreach ($readings as $reading) {
+        if (($reading['source'] ?? '') !== 'device') {
+            continue;
+        }
+
+        $timestamp = strtotime($reading['timestamp'] ?? '');
+        $pm25 = $reading['pm25'] ?? $reading['pm2_5'] ?? $reading['pm2.5'] ?? null;
+        $classification = classifyPm25($pm25);
+        $isHighReading = $timestamp
+            && is_numeric($pm25)
+            && in_array($classification['level'], ['UNHEALTHY', 'HAZARDOUS'], true);
+
+        if (!$isHighReading) {
+            if ($currentEvent !== null) {
+                $events[] = $currentEvent;
+                $currentEvent = null;
+            }
+            continue;
+        }
+
+        $pm25 = (float) $pm25;
+        if ($currentEvent !== null && $timestamp - $currentEvent['last_timestamp_unix'] > 1800) {
+            $events[] = $currentEvent;
+            $currentEvent = null;
+        }
+        if ($currentEvent === null) {
+            $currentEvent = [
+                'first_timestamp' => $reading['timestamp'],
+                'last_timestamp' => $reading['timestamp'],
+                'last_timestamp_unix' => $timestamp,
+                'peak_pm25' => $pm25,
+                'peak_classification' => $classification['label'],
+                'reading_count' => 1
+            ];
+            continue;
+        }
+
+        $currentEvent['last_timestamp'] = $reading['timestamp'];
+        $currentEvent['last_timestamp_unix'] = $timestamp;
+        $currentEvent['reading_count']++;
+        if ($pm25 > $currentEvent['peak_pm25']) {
+            $currentEvent['peak_pm25'] = $pm25;
+            $currentEvent['peak_classification'] = $classification['label'];
+        }
+    }
+
+    if ($currentEvent !== null) {
+        $events[] = $currentEvent;
+    }
+    return array_slice(array_reverse($events), 0, 50);
+}
+
 function logActivity($action, $userId = null, $username = null, $role = null) {
     try {
         firebasePush('activity_logs', [
