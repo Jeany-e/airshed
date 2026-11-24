@@ -8,7 +8,10 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 try {
     $cutoff = time() - 30 * 24 * 60 * 60;
     $records = [];
-    foreach (firebaseRows('sensor_logs') as $record) {
+    foreach (firebaseRows('sensor_logs', [
+        'orderBy' => '"timestamp"',
+        'limitToLast' => 5000
+    ]) as $record) {
         if (($record['source'] ?? '') !== 'device') {
             continue;
         }

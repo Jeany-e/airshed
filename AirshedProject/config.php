@@ -10,9 +10,10 @@ if (!$firebaseSecret) {
     die('Firebase is not configured. Set FIREBASE_DATABASE_SECRET in the server environment.');
 }
 
-function firebaseRequest($path, $method = 'GET', $data = null) {
+function firebaseRequest($path, $method = 'GET', $data = null, array $query = []) {
     global $firebaseSecret;
-    $url = rtrim(FIREBASE_DATABASE_URL, '/') . '/' . trim($path, '/') . '.json?auth=' . rawurlencode($firebaseSecret);
+    $query = ['auth' => $firebaseSecret] + $query;
+    $url = rtrim(FIREBASE_DATABASE_URL, '/') . '/' . trim($path, '/') . '.json?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
     $ch = curl_init($url);
     $caCandidates = [
         'C:/wamp/bin/php/php8.2.0/extras/ssl/cacert.pem',
@@ -57,8 +58,8 @@ function firebaseUpdate($path, array $data) {
     return firebaseRequest($path, 'PATCH', $data);
 }
 
-function firebaseRows($path) {
-    $items = firebaseRequest($path) ?: [];
+function firebaseRows($path, array $query = []) {
+    $items = firebaseRequest($path, 'GET', null, $query) ?: [];
     $rows = [];
     foreach ($items as $key => $item) {
         if (is_array($item)) {

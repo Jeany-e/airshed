@@ -17,7 +17,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 try {
     $latestReading = null;
-    foreach (firebaseRows('sensor_logs') as $reading) {
+    foreach (firebaseRows('sensor_logs', [
+        'orderBy' => '"timestamp"',
+        'limitToLast' => 100
+    ]) as $reading) {
         if (($reading['source'] ?? '') !== 'device') {
             continue;
         }
@@ -44,7 +47,10 @@ try {
     }
 
     $lastAlertTimestamp = 0;
-    foreach (firebaseRows('alert_logs') as $alert) {
+    foreach (firebaseRows('alert_logs', [
+        'orderBy' => '"timestamp"',
+        'limitToLast' => 1
+    ]) as $alert) {
         $timestamp = strtotime($alert['timestamp'] ?? '');
         if ($timestamp > $lastAlertTimestamp) {
             $lastAlertTimestamp = $timestamp;

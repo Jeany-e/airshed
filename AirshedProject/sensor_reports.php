@@ -2,35 +2,30 @@
 require __DIR__ . '/config.php';
 
 date_default_timezone_set('Asia/Manila');
+unset($_SESSION['sensor_reports_logs_cache']);
 $isAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 $logs = [];
 $error = '';
-$reportsCacheKey = 'sensor_reports_logs_cache';
-$reportsCacheTtl = 30;
+$reportRecordLimit = 5000;
 
-if (isset($_SESSION[$reportsCacheKey]['logs'], $_SESSION[$reportsCacheKey]['created_at'])
-    && time() - $_SESSION[$reportsCacheKey]['created_at'] < $reportsCacheTtl) {
-    $logs = $_SESSION[$reportsCacheKey]['logs'];
-} else {
+try {
+    $logs = firebaseRows('sensor_logs', [
+        'orderBy' => '"timestamp"',
+        'limitToLast' => $reportRecordLimit
+    ]);
+} catch (Throwable $exception) {
+    usleep(150000);
     try {
-        $logs = firebaseRows('sensor_logs');
-        $_SESSION[$reportsCacheKey] = [
-            'logs' => $logs,
-            'created_at' => time()
-        ];
-    } catch (Throwable $exception) {
-        usleep(150000);
-        try {
-            $logs = firebaseRows('sensor_logs');
-            $_SESSION[$reportsCacheKey] = [
-                'logs' => $logs,
-                'created_at' => time()
-            ];
-        } catch (Throwable $retryException) {
-            $error = 'Sensor history is temporarily unavailable.';
-        }
+        $logs = firebaseRows('sensor_logs', [
+            'orderBy' => '"timestamp"',
+            'limitToLast' => $reportRecordLimit
+        ]);
+    } catch (Throwable $retryException) {
+        error_log('Sensor report history unavailable: ' . $retryException->getMessage());
+        $error = 'Sensor history is temporarily unavailable.';
     }
 }
+$historyCapped = count($logs) >= $reportRecordLimit;
 
 $logs = array_values(array_filter($logs, function ($log) {
     return ($log['source'] ?? '') === 'device';
@@ -414,6 +409,14 @@ $averageDelta = $dailyPm25 && $previousPm25
         <section class="intro">
             <div>
                 <h1>Sensor Reports</h1>
+                <p>
+                    Showing up to <?php echo number_format($reportRecordLimit); ?> of the most recent sensor-log records.
+                    <?php if ($historyCapped): ?>
+                        The history limit was reached, so daily averages and comparisons may exclude older readings from that day.
+                    <?php else: ?>
+                        Daily averages and comparisons use the device readings loaded here.
+                    <?php endif; ?>
+                </p>
             </div>
         </section>
 
@@ -511,7 +514,7 @@ $averageDelta = $dailyPm25 && $previousPm25
                 </form>
                 <?php if ($days): ?>
                     <div class="overall-reading">
-                        <span>Overall Readings</span>
+                        <span>Recent Readings Loaded</span>
                         <strong><?php echo count($logs); ?></strong>
                     </div>
                 <?php endif; ?>
