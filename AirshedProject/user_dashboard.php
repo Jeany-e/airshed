@@ -519,6 +519,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
     let serverForecast2h = null;
     let serverForecastTemp = null;
     let serverForecastHum = null;
+    let liveDataAvailable = false;
     let selectedForecastMinutes = 5;
     let predictionLocked = false;
     let offlineReadingShown = false;
@@ -612,6 +613,17 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         const now = Date.now();
         if (!force && predictionLocked && (now - predictionLastUpdatedAt < predictionWindowMs)) return;
 
+        if (!liveDataAvailable) {
+            predictionSnapshot = { pm: null, hum: null, temp: null, outlook: 'Pleasant' };
+            predictionLocked = false;
+            predictionLastUpdatedAt = now;
+            document.getElementById('selectedForecast').innerText = '--';
+            document.getElementById('humForecast').innerText = '--';
+            document.getElementById('weatherForecast').innerText = 'No live sensor data';
+            document.getElementById('aiInsight').innerText = 'Forecasts are paused while the sensor is offline.';
+            return;
+        }
+
         const pmHistoryData = pmHistory;
         const currentTemp = tempHistory.length ? tempHistory[tempHistory.length - 1] : null;
         const currentHum = humHistory.length ? humHistory[humHistory.length - 1] : null;
@@ -690,6 +702,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             serverForecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : null;
             serverForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
             if (d.live === false) {
+                liveDataAvailable = false;
                 predictionHistory = d.prediction_history || [];
                 tempHistory = predictionHistory.map(reading => Number(reading.temp));
                 humHistory = predictionHistory.map(reading => Number(reading.hum));
@@ -709,6 +722,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 updatePredictionSnapshot(true);
                 return;
             }
+            liveDataAvailable = true;
             offlineReadingShown = false;
             predictionHistory = [];
             const currentTemp = parseFloat(d.temp);

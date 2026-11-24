@@ -889,6 +889,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
     let serverForecast2h = null;
     let serverForecastTemp = null;
     let serverForecastHum = null;
+    let liveDataAvailable = false;
     let offlineReadingShown = false;
     let predictionLocked = false;
     let predictionSnapshot = { pm: null, hum: null, temp: null, outlook: 'Pleasant' };
@@ -1056,6 +1057,17 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         const now = Date.now();
         if (!force && predictionLocked && (now - predictionLastUpdatedAt < predictionWindowMs)) return;
 
+        if (!liveDataAvailable) {
+            predictionSnapshot = { pm: null, hum: null, temp: null, outlook: 'Pleasant' };
+            predictionLocked = false;
+            predictionLastUpdatedAt = now;
+            document.getElementById('forecastVal').innerText = '--';
+            document.getElementById('humidityForecast').innerText = '--';
+            document.getElementById('weatherForecast').innerText = 'No live sensor data';
+            document.getElementById('aiInsight').innerText = 'Forecasts are paused while the sensor is offline.';
+            return;
+        }
+
         const pmHistory = predictionHistory.length ? predictionHistory.map(reading => reading.pm25) : chart.data.datasets[0].data;
         const currentTemp = tempHistory.length ? tempHistory[tempHistory.length - 1] : null;
         const currentHum = humHistory.length ? humHistory[humHistory.length - 1] : null;
@@ -1125,6 +1137,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
             serverForecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : null;
             serverForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
             if (d.live === false) {
+                liveDataAvailable = false;
                 predictionHistory = d.prediction_history || [];
                 tempHistory = predictionHistory.map(reading => Number(reading.temp));
                 humHistory = predictionHistory.map(reading => Number(reading.hum));
@@ -1149,6 +1162,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 updatePredictionSnapshot(true);
                 return;
             }
+            liveDataAvailable = true;
             predictionHistory = [];
             offlineReadingShown = false;
             const currentTemp = parseFloat(d.temp);

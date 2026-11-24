@@ -6,8 +6,11 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 
 try {
     $records = array_values(array_filter(firebaseRows('sensor_logs'), function ($record) {
+        $pm25 = $record['pm25'] ?? $record['pm2_5'] ?? $record['pm2.5'] ?? null;
         return ($record['source'] ?? '') === 'device'
-            && (isset($record['pm25']) || isset($record['pm2_5']) || isset($record['pm2.5']));
+            && is_numeric($pm25)
+            && (float) $pm25 >= 0
+            && (float) $pm25 <= 1000;
     }));
     foreach ($records as &$record) {
         $record['pm25'] = $record['pm25'] ?? $record['pm2_5'] ?? $record['pm2.5'];

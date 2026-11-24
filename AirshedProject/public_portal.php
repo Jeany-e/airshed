@@ -667,33 +667,11 @@ function fetchData() {
                 chart.data.datasets[2].data = recentHistory.map(reading => Number(reading.hum)).filter(Number.isFinite);
                 chart.data.datasets[3].data = recentHistory.map(reading => Number(reading.co)).filter(Number.isFinite);
                 chart.update('none');
-                const recentPmHistory = recentHistory
-                    .map(reading => Number(reading.pm25))
-                    .filter(Number.isFinite);
-                const recentTempHistory = recentHistory
-                    .map(reading => Number(reading.temp))
-                    .filter(Number.isFinite)
-                    .filter(value => value > 0);
-                const recentHumHistory = recentHistory
-                    .map(reading => Number(reading.hum))
-                    .filter(Number.isFinite)
-                    .filter(value => value > 0);
-                const recentP30 = d.forecast30 !== undefined ? d.forecast30 : getPrediction(recentPmHistory, 30);
-                const recentP2h = d.forecast2h !== undefined ? d.forecast2h : getPrediction(recentPmHistory, 120);
-                const recentForecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : getPrediction(recentTempHistory, 30);
-                const recentForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : getPrediction(recentHumHistory, 30);
-                const recentTempValue = clampForecast(recentForecastTemp, 0, 60);
-                const recentHumValue = clampForecast(recentForecastHum, 0, 100);
-
-                document.getElementById('forecast30').innerText = recentP30 !== null ? Number(recentP30).toFixed(1) : '---';
-                document.getElementById('forecastVal').innerText = recentP2h !== null ? Number(recentP2h).toFixed(1) : '---';
-                document.getElementById('humForecast').innerText = recentHumValue !== null ? `${recentHumValue.toFixed(1)}%` : '--';
-                document.getElementById('weatherForecast').innerText = recentTempValue !== null
-                    ? `${getWeatherOutlook(recentTempValue, recentHumValue)} · ${recentTempValue.toFixed(1)}°C`
-                    : 'Waiting for live sensor data...';
-                document.getElementById('aiInsight').innerHTML = recentP2h !== null
-                    ? 'Forecast based on the latest available sensor readings. Live sensor data is currently offline.'
-                    : 'Waiting for enough sensor readings to calculate a forecast.';
+                document.getElementById('forecast30').innerText = '---';
+                document.getElementById('forecastVal').innerText = '---';
+                document.getElementById('humForecast').innerText = '--';
+                document.getElementById('weatherForecast').innerText = 'No live sensor data';
+                document.getElementById('aiInsight').innerText = 'Forecasts are paused while the sensor is offline.';
             return;
         }
 
