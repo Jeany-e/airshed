@@ -22,39 +22,8 @@
         return level === 'UNHEALTHY' || level === 'HAZARDOUS';
     }
 
-    function forecastSummary(metrics, basis) {
-        if (!metrics || metrics.available !== true) {
-            return `No estimate yet. ${(metrics && metrics.reason) || 'More recent readings are needed.'}`;
-        }
-
-        const backtests = Number(metrics.backtest_samples);
-        const mae = Number(metrics.mae);
-        const unit = metrics.unit || 'units';
-        const errorText = Number.isFinite(backtests) && Number.isFinite(mae)
-            ? ` In ${backtests} past checks, it was off by about ${mae.toFixed(1)} ${unit} on average.`
-            : '';
-
-        if (metrics.method === 'baseline') {
-            return `Recent readings did not show a reliable trend, so this estimate uses the latest reading.${errorText}`;
-        }
-
-        const samples = Number(basis && basis.sample_count);
-        const spanMinutes = Number(basis && basis.span_minutes);
-        const basisText = Number.isFinite(samples) && Number.isFinite(spanMinutes)
-            ? `Estimate uses ${samples} recent readings from the past ${spanMinutes.toFixed(0)} minutes.`
-            : 'Estimate uses recent readings.';
-
-        if (!Number.isFinite(backtests) || !Number.isFinite(mae)) {
-            return `${basisText} Past accuracy information is not available yet.`;
-        }
-
-        const accuracy = Number(metrics.accuracy_pct);
-        const comparisonText = Number.isFinite(accuracy)
-            ? accuracy > 0
-                ? ` It was ${accuracy.toFixed(1)}% more accurate than using the latest reading alone.`
-                : ' It was about as accurate as using the latest reading alone.'
-            : '';
-        return `${basisText}${errorText}${comparisonText}`;
+    function forecastSummary() {
+        return '';
     }
 
     function escapeHtml(value) {

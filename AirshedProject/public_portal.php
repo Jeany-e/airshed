@@ -459,13 +459,13 @@ include "config.php";
                     <span class="pred-label">Next 30 Minutes</span>
                     <span id="forecast30" class="pred-number">---</span>
                     <span class="unit">µg/m³</span>
-                    <span id="forecast30Meta" class="forecast-disclaimer"></span>
+                    <span id="forecast30Meta" class="forecast-disclaimer" hidden></span>
                 </div>
                 <div class="pred-box emphasis">
                     <span class="pred-label">Next 2 Hours</span>
                     <span id="forecastVal" class="pred-number">---</span>
                     <span class="unit">µg/m³</span>
-                    <span id="forecast2hMeta" class="forecast-disclaimer"></span>
+                    <span id="forecast2hMeta" class="forecast-disclaimer" hidden></span>
                 </div>
             </div>
         </div>
@@ -475,12 +475,12 @@ include "config.php";
                 <div style="background:#fff; border: 1px solid #dbe5f4; border-radius:16px; padding:14px; text-align:center;">
                     <div style="font-size:12px; font-weight:800; color:var(--primary); text-transform:uppercase;">Humidity Forecast</div>
                     <div id="humForecast" style="font-size:28px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                    <div id="humidityForecastMeta" class="forecast-disclaimer"></div>
+                    <div id="humidityForecastMeta" class="forecast-disclaimer" hidden></div>
                 </div>
                 <div style="background:#fff; border: 1px solid #dbe5f4; border-radius:16px; padding:14px; text-align:center;">
                     <div style="font-size:12px; font-weight:800; color:var(--primary); text-transform:uppercase;">Weather Outlook</div>
                     <div id="weatherForecast" style="font-size:20px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                    <div id="weatherForecastMeta" class="forecast-disclaimer"></div>
+                    <div id="weatherForecastMeta" class="forecast-disclaimer" hidden></div>
                 </div>
             </div>
             <h4 style="margin: 0 0 10px 0; color: var(--primary); font-size: 20px; font-weight: 800;">STATUS RECOMMENDATION</h4>

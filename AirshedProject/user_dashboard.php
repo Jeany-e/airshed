@@ -397,19 +397,19 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                             <div id="selectedForecast" class="selected-forecast-value">--</div>
                             <div style="font-size:12px; font-weight:700; color:#7f7f9a;">µg/m³</div>
                             <div id="selectedForecastLabel" class="selected-forecast-note">Next 30 minutes</div>
-                            <div id="selectedForecastMeta" class="selected-forecast-note"></div>
+                            <div id="selectedForecastMeta" class="selected-forecast-note" hidden></div>
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:20px;">
                         <div class="forecast-tile" style="background:#f6f4ff; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">Humidity Forecast</label>
                             <div id="humForecast" style="font-size:24px; font-weight:900;">--</div>
-                            <div id="humidityForecastMeta" class="selected-forecast-note"></div>
+                            <div id="humidityForecastMeta" class="selected-forecast-note" hidden></div>
                         </div>
                         <div class="forecast-tile" style="background:#ecfdf3; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; color:#2e7d32;">Weather Outlook</label>
                             <div id="weatherForecast" style="font-size:18px; font-weight:900;">--</div>
-                            <div id="weatherForecastMeta" class="selected-forecast-note"></div>
+                            <div id="weatherForecastMeta" class="selected-forecast-note" hidden></div>
                         </div>
                     </div>
                     <div style="display:flex; gap:10px; margin-top:12px;">
@@ -417,13 +417,13 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                             <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">PM2.5 · NEXT 30 MIN</label>
                             <div id="predict30" style="font-size:24px; font-weight:900;">--</div>
                             <div style="font-size:11px; font-weight:700; color:#7f7f9a;">µg/m³</div>
-                            <div id="predict30Meta" class="selected-forecast-note"></div>
+                            <div id="predict30Meta" class="selected-forecast-note" hidden></div>
                         </div>
                         <div class="forecast-tile" style="flex:1; background:var(--ai-purple); color:#fff; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; opacity:0.8;">PM2.5 · NEXT 2 HOURS</label>
                             <div id="predict2h" style="font-size:24px; font-weight:900;">--</div>
                             <div style="font-size:11px; font-weight:700; opacity:0.8;">µg/m³</div>
-                            <div id="predict2hMeta" class="selected-forecast-note" style="color:rgba(255,255,255,.82);"></div>
+                            <div id="predict2hMeta" class="selected-forecast-note" style="color:rgba(255,255,255,.82);" hidden></div>
                         </div>
                     </div>
                     <p class="forecast-disclaimer">Forecast values are estimates based on recent device readings and may change as new data arrives.</p>

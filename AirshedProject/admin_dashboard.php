@@ -627,18 +627,18 @@ try {
                         <span id="forecastVal" style="font-size: 40px; font-weight: 900; color: var(--ai-purple);">---</span>
                         <span class="unit">µg/m³</span>
                     </div>
-                    <div class="forecast-meta" id="selectedForecastMeta"></div>
+                    <div class="forecast-meta" id="selectedForecastMeta" hidden></div>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px;">
                     <div style="background:#f6f4ff; padding:14px; border-radius:12px; border:1px solid #e8e0ff; text-align:center;">
                         <div style="font-size:11px; font-weight:800; color:var(--ai-purple); text-transform:uppercase;">Humidity Forecast</div>
                         <div id="humidityForecast" style="font-size:24px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                        <div class="forecast-meta" id="humidityForecastMeta"></div>
+                        <div class="forecast-meta" id="humidityForecastMeta" hidden></div>
                     </div>
                     <div style="background:#ecfdf3; padding:14px; border-radius:12px; border:1px solid #dcfce7; text-align:center;">
                         <div style="font-size:11px; font-weight:800; color:#2e7d32; text-transform:uppercase;">Weather Outlook</div>
                         <div id="weatherForecast" style="font-size:18px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                        <div class="forecast-meta" id="weatherForecastMeta"></div>
+                        <div class="forecast-meta" id="weatherForecastMeta" hidden></div>
                     </div>
                 </div>
                 <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0; display: flex; align-items: center; margin-top: 14px;">
