@@ -149,6 +149,8 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         .resolve-btn:hover { opacity: 0.8; }
         .promote-btn { background: var(--ai-purple); color: #fff; border: 0; border-radius: 6px; padding: 7px 10px; font-size: 10px; font-weight: 800; cursor: pointer; }
         .promote-btn:hover { opacity: .85; }
+        .edit-name-btn { background: #fff; color: var(--ai-purple); border: 1px solid var(--ai-purple); border-radius: 6px; padding: 7px 10px; font-size: 10px; font-weight: 800; cursor: pointer; }
+        .edit-name-btn:hover { background: #eef4ff; }
 
         @media (max-width: 900px) {
             body { display: block; height: auto; min-height: 100vh; overflow: auto; }
@@ -724,6 +726,8 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                             <td><span style="background: #eef2ff; padding: 4px 10px; border-radius: 5px; font-size: 12px; font-weight: bold;"><?php echo strtoupper($user['role']); ?></span></td>
                             <td><?php echo date('M d, Y', strtotime($user['created_at'])); ?></td>
                             <td>
+                                <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                                <button type="button" class="edit-name-btn" onclick="editAccountName('<?php echo htmlspecialchars($user['id'], ENT_QUOTES); ?>', <?php echo json_encode($user['username'] ?? ''); ?>)">EDIT NAME</button>
                                 <?php if (($user['role'] ?? 'user') !== 'admin'): ?>
                                     <form method="POST" action="promote_user.php" onsubmit="return confirm('Make this user an administrator?');">
                                         <input type="hidden" name="id" value="<?php echo htmlspecialchars($user['id'], ENT_QUOTES); ?>">
@@ -732,6 +736,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                                 <?php else: ?>
                                     <span style="color: #2e7d32; font-size: 11px; font-weight: 800;">ADMIN</span>
                                 <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -880,6 +885,10 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
     let tempHistory = [];
     let humHistory = [];
     let predictionHistory = [];
+    let serverForecast30 = null;
+    let serverForecast2h = null;
+    let serverForecastTemp = null;
+    let serverForecastHum = null;
     let offlineReadingShown = false;
     let predictionLocked = false;
     let predictionSnapshot = { pm: null, hum: null, temp: null, outlook: 'Pleasant' };
@@ -919,13 +928,74 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         })
     }
 
+    function editAccountName(userId, currentName) {
+        Swal.fire({
+                title: 'Edit account name',
+                input: 'text',
+                inputLabel: 'Username',
+                inputValue: currentName,
+                showCancelButton: true,
+                confirmButtonText: 'Save name',
+                confirmButtonColor: '#174ea6',
+                inputValidator: value => {
+                    if (!value || !value.trim()) return 'Please enter a username.';
+                    return null;
+                }
+        }).then(result => {
+                if (!result.isConfirmed) return;
+
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'update_account_name.php';
+
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'id';
+                idInput.value = userId;
+
+                const nameInput = document.createElement('input');
+                nameInput.type = 'hidden';
+                nameInput.name = 'username';
+                nameInput.value = result.value.trim();
+
+                form.append(idInput, nameInput);
+                document.body.appendChild(form);
+                form.submit();
+        });
+    }
+
     const ctx = document.getElementById('pollutantChart').getContext('2d');
     const chart = new Chart(ctx, {
         type: 'line',
         data: { 
             labels: [], 
             datasets: [
-                { label: 'PM2.5 (µg/m³)', data: [], borderColor: '#1a237e', backgroundColor: 'rgba(26, 35, 126, 0.1)', fill: true, tension: 0.4, yAxisID: 'y' },
+                {
+                    label: 'PM2.5 (µg/m³)',
+                    data: [],
+                    borderColor: '#168a68',
+                    backgroundColor: 'rgba(22, 138, 104, 0.12)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBorderWidth: 2,
+                    pointBackgroundColor: function(context) {
+                        const value = Number(context.raw);
+                        return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                    },
+                    pointBorderColor: function(context) {
+                        const value = Number(context.raw);
+                        return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                    },
+                    segment: {
+                        borderColor: function(context) {
+                            const value = Number(context.p1.raw);
+                            return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                        }
+                    }
+                },
                 { label: 'Temperature (°C)', data: [], borderColor: '#ff7043', backgroundColor: 'transparent', fill: false, tension: 0.4, yAxisID: 'y1' },
                 { label: 'Humidity (%)', data: [], borderColor: '#00a896', backgroundColor: 'transparent', fill: false, tension: 0.4, yAxisID: 'y2' },
                 { label: 'Gas/MQ', data: [], borderColor: '#8e44ad', backgroundColor: 'transparent', fill: false, tension: 0.4, yAxisID: 'y3' }
@@ -989,9 +1059,13 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         const pmHistory = predictionHistory.length ? predictionHistory.map(reading => reading.pm25) : chart.data.datasets[0].data;
         const currentTemp = tempHistory.length ? tempHistory[tempHistory.length - 1] : null;
         const currentHum = humHistory.length ? humHistory[humHistory.length - 1] : null;
-        const forecast = runAIPrediction(pmHistory, selectedPredictionMinutes) ?? (pmHistory.length ? pmHistory[pmHistory.length - 1] : null);
-        const forecastTemp = runAIPrediction(tempHistory, 5) ?? currentTemp;
-        const forecastHum = runAIPrediction(humHistory, 5) ?? currentHum;
+        const forecast = (selectedPredictionMinutes === 30 && serverForecast30 !== null)
+            ? serverForecast30
+            : ((selectedPredictionMinutes === 120 && serverForecast2h !== null)
+                ? serverForecast2h
+                : (runAIPrediction(pmHistory, selectedPredictionMinutes) ?? (pmHistory.length ? pmHistory[pmHistory.length - 1] : null)));
+        const forecastTemp = serverForecastTemp !== null ? serverForecastTemp : (runAIPrediction(tempHistory, 5) ?? currentTemp);
+        const forecastHum = serverForecastHum !== null ? serverForecastHum : (runAIPrediction(humHistory, 5) ?? currentHum);
         const outlook = currentTemp !== null && currentHum !== null ? getWeatherOutlook(currentTemp, currentHum) : 'Pleasant';
 
         predictionSnapshot = { pm: forecast, hum: forecastHum, temp: forecastTemp, outlook };
@@ -1046,6 +1120,10 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
         fetch('get_latest_data.php', { cache: 'no-store' })
         .then(res => res.json())
         .then(d => {
+            serverForecast30 = d.forecast30 !== undefined ? d.forecast30 : null;
+            serverForecast2h = d.forecast2h !== undefined ? d.forecast2h : null;
+            serverForecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : null;
+            serverForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
             if (d.live === false) {
                 predictionHistory = d.prediction_history || [];
                 tempHistory = predictionHistory.map(reading => Number(reading.temp));
@@ -1084,7 +1162,8 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
 
             document.getElementById('temp').innerText = d.temp;
             document.getElementById('hum').innerText = d.hum;
-            document.getElementById('pm25').innerText = d.pm25;
+            document.getElementById('pm25').innerText = Number(d.pm25).toFixed(1);
+            document.getElementById('pm25').style.color = Number(d.pm25) > 35 ? "#d32f2f" : (Number(d.pm25) > 12 ? "#d88a18" : "#168a68");
             document.getElementById('co').innerText = d.co;
             document.getElementById('bat').innerText = d.battery;
 
@@ -1132,9 +1211,16 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
             chart.data.datasets[2].data.push(d.hum);
             chart.data.datasets[3].data.push(d.co);
             if(chart.data.labels.length > 12) { chart.data.labels.shift(); chart.data.datasets.forEach(dataset => dataset.data.shift()); }
+            const pmValues = chart.data.datasets[0].data.map(value => Number(value)).filter(Number.isFinite);
+            const pmMaximum = pmValues.length ? Math.max(...pmValues) : 0;
+            chart.options.scales.y.suggestedMax = pmMaximum > 40
+                ? Math.ceil(pmMaximum / 50) * 50
+                : 40;
             chart.update('none');
 
-            let row = `<tr><td><b>${t}</b></td><td>${d.temp}°C</td><td>${d.hum}%</td><td>${d.pm25}</td><td>${d.co}</td><td style="color:${color}; font-weight:bold;">${status}</td><td style="color:var(--accent); font-weight:bold;">ONLINE</td></tr>`;
+            const pmValue = parseFloat(d.pm25);
+            const pmColor = pmValue > 35 ? "#d32f2f" : (pmValue > 12 ? "#d88a18" : "#168a68");
+            let row = `<tr><td><b>${t}</b></td><td>${d.temp}°C</td><td>${d.hum}%</td><td style="color:${pmColor}; font-weight:900;">${pmValue.toFixed(1)}</td><td>${d.co}</td><td style="color:${color}; font-weight:bold;">${status}</td><td style="color:var(--accent); font-weight:bold;">ONLINE</td></tr>`;
             const hBody = document.getElementById('historyBody');
             hBody.insertAdjacentHTML("afterbegin", row);
             if(hBody.rows.length > 15) hBody.deleteRow(15);
@@ -1152,6 +1238,16 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
     const userSearch = document.getElementById('userSearch');
     const roleFilter = document.getElementById('roleFilter');
     const activitySearch = document.getElementById('activitySearch');
+    if (new URLSearchParams(window.location.search).get('name_updated') === '1') {
+        Swal.fire({
+            icon: 'success',
+            title: 'Name updated',
+            text: 'The account name has been saved.',
+            timer: 2200,
+            showConfirmButton: false
+        });
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
     function filterUsers() {
         const query = (userSearch?.value || '').toLowerCase();
         const role = roleFilter?.value || 'all';

@@ -568,7 +568,8 @@ function renderHistoryRows(history) {
         const co = Number(reading.co);
         const humidityText = Number.isFinite(humidity) ? `${humidity.toFixed(1)}%` : '--';
         const coText = Number.isFinite(co) ? co.toFixed(1) : '--';
-        historyBody.insertAdjacentHTML('beforeend', `<tr><td><b>${readingTime}</b></td><td style="color:#b87512">${temp.toFixed(1)}°C</td><td>${humidityText}</td><td>${pm25.toFixed(1)}</td><td>${coText}</td><td style="color:${statusColor}; font-weight:900;">${status}</td></tr>`);
+        const pmColor = pm25 > 35 ? '#c43d4b' : (pm25 > 12 ? '#d88a18' : '#168a68');
+        historyBody.insertAdjacentHTML('beforeend', `<tr><td><b>${readingTime}</b></td><td style="color:#b87512">${temp.toFixed(1)}°C</td><td>${humidityText}</td><td style="color:${pmColor}; font-weight:900;">${pm25.toFixed(1)}</td><td>${coText}</td><td style="color:${statusColor}; font-weight:900;">${status}</td></tr>`);
     });
 }
 
@@ -579,7 +580,31 @@ const chart = new Chart(ctx, {
     data: { 
         labels: [], 
         datasets: [
-            { label: 'PM2.5', data: [], borderColor: '#c43d4b', backgroundColor: 'rgba(196, 61, 75, 0.12)', borderWidth: 5, fill: true, tension: 0.4, yAxisID: 'y' },
+            {
+                label: 'PM2.5',
+                data: [],
+                borderColor: '#168a68',
+                backgroundColor: 'rgba(22, 138, 104, 0.12)',
+                borderWidth: 5,
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y',
+                pointRadius: 4,
+                pointBackgroundColor: function(context) {
+                    const value = Number(context.raw);
+                    return value > 35 ? '#c43d4b' : (value > 12 ? '#d88a18' : '#168a68');
+                },
+                pointBorderColor: function(context) {
+                    const value = Number(context.raw);
+                    return value > 35 ? '#c43d4b' : (value > 12 ? '#d88a18' : '#168a68');
+                },
+                segment: {
+                    borderColor: function(context) {
+                        const value = Number(context.p1.raw);
+                        return value > 35 ? '#c43d4b' : (value > 12 ? '#d88a18' : '#168a68');
+                    }
+                }
+            },
             { label: 'Temp', data: [], borderColor: '#d88a18', borderWidth: 3, borderDash: [5, 5], tension: 0.4, yAxisID: 'y1' },
             { label: 'Humidity', data: [], borderColor: '#0f9f86', borderWidth: 3, tension: 0.4, yAxisID: 'y1' },
             { label: 'Gas/MQ', data: [], borderColor: '#8e44ad', borderWidth: 3, tension: 0.4, yAxisID: 'y1' }
@@ -594,19 +619,31 @@ const chart = new Chart(ctx, {
     }
 });
 
-function getPrediction(history, steps) {
+function getPrediction(history, horizonMinutes) {
     if (history.length < 5) return null;
-    let n = history.length, x = Array.from({length: n}, (_, i) => i);
-    let sumX = x.reduce((a,b) => a+b, 0), sumY = history.reduce((a,b) => a+b, 0);
-    let sumXY = x.reduce((acc, curr, i) => acc + (curr * history[i]), 0);
-    let sumXX = x.reduce((a,b) => a + (b*b), 0);
-    let slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    let intercept = (sumY - slope * sumX) / n;
-    let projected = Math.max(0, slope * (n + steps) + intercept);
-    let observedMax = Math.max(...history);
-    let observedMin = Math.min(...history);
-    let reasonableCeiling = observedMax + Math.max(10, (observedMax - observedMin) * 2);
-    return Math.min(projected, reasonableCeiling).toFixed(1);
+    const n = history.length;
+    let sumWeight = 0, sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (let i = 0; i < n; i++) {
+        const weight = 0.5 + 1.5 * (i / Math.max(1, n - 1));
+        sumWeight += weight;
+        sumX += weight * i;
+        sumY += weight * history[i];
+        sumXY += weight * i * history[i];
+        sumX2 += weight * i * i;
+    }
+    const denominator = sumWeight * sumX2 - sumX * sumX;
+    if (Math.abs(denominator) < 0.000001) return null;
+    const slope = (sumWeight * sumXY - sumX * sumY) / denominator;
+    const intercept = (sumY - slope * sumX) / sumWeight;
+    const projected = intercept + slope * (n - 1 + horizonMinutes);
+    const latest = history[n - 1];
+    const factor = horizonMinutes <= 30 ? 0.85 : 0.35;
+    let forecast = latest + (projected - latest) * factor;
+    const observedMin = Math.min(...history);
+    const observedMax = Math.max(...history);
+    const allowedRange = Math.max(10, (observedMax - observedMin) * 1.5);
+    forecast = Math.min(observedMax + allowedRange, Math.max(observedMin - allowedRange, forecast));
+    return Math.max(0, forecast).toFixed(1);
 }
 
 function fetchData() {
@@ -641,20 +678,20 @@ function fetchData() {
                     .map(reading => Number(reading.hum))
                     .filter(Number.isFinite)
                     .filter(value => value > 0);
-                const recentP30 = getPrediction(recentPmHistory, 600);
-                const recentP2h = getPrediction(recentPmHistory, 2400);
-                const recentForecastTemp = getPrediction(recentTempHistory, 600);
-                const recentForecastHum = getPrediction(recentHumHistory, 600);
+                const recentP30 = d.forecast30 !== undefined ? d.forecast30 : getPrediction(recentPmHistory, 30);
+                const recentP2h = d.forecast2h !== undefined ? d.forecast2h : getPrediction(recentPmHistory, 120);
+                const recentForecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : getPrediction(recentTempHistory, 30);
+                const recentForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : getPrediction(recentHumHistory, 30);
                 const recentTempValue = clampForecast(recentForecastTemp, 0, 60);
                 const recentHumValue = clampForecast(recentForecastHum, 0, 100);
 
-                document.getElementById('forecast30').innerText = recentP30 || '---';
-                document.getElementById('forecastVal').innerText = recentP2h || '---';
+                document.getElementById('forecast30').innerText = recentP30 !== null ? Number(recentP30).toFixed(1) : '---';
+                document.getElementById('forecastVal').innerText = recentP2h !== null ? Number(recentP2h).toFixed(1) : '---';
                 document.getElementById('humForecast').innerText = recentHumValue !== null ? `${recentHumValue.toFixed(1)}%` : '--';
                 document.getElementById('weatherForecast').innerText = recentTempValue !== null
                     ? `${getWeatherOutlook(recentTempValue, recentHumValue)} · ${recentTempValue.toFixed(1)}°C`
                     : 'Waiting for live sensor data...';
-                document.getElementById('aiInsight').innerHTML = recentP2h
+                document.getElementById('aiInsight').innerHTML = recentP2h !== null
                     ? 'Forecast based on the latest available sensor readings. Live sensor data is currently offline.'
                     : 'Waiting for enough sensor readings to calculate a forecast.';
             return;
@@ -678,15 +715,16 @@ function fetchData() {
         if (tempHistory.length > 12) tempHistory.shift();
         if (humHistory.length > 12) humHistory.shift();
 
-        const forecastTemp = tempHistory.length >= 5 ? getPrediction(tempHistory, 600) : null;
-        const forecastHum = humHistory.length >= 5 ? getPrediction(humHistory, 600) : null;
+        const forecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : (tempHistory.length >= 5 ? getPrediction(tempHistory, 30) : null);
+        const forecastHum = d.forecast_hum !== undefined ? d.forecast_hum : (humHistory.length >= 5 ? getPrediction(humHistory, 30) : null);
         const forecastTempValue = clampForecast(forecastTemp, 0, 60);
         const forecastHumValue = clampForecast(forecastHum, 0, 100);
         const outlook = getWeatherOutlook(currentTemp, currentHum);
 
         document.getElementById('temp').innerText = d.temp;
         document.getElementById('hum').innerText = d.hum;
-        document.getElementById('pm25').innerText = d.pm25;
+        document.getElementById('pm25').innerText = Number(d.pm25).toFixed(1);
+        document.getElementById('pm25').style.color = Number(d.pm25) > 35 ? "#c43d4b" : (Number(d.pm25) > 12 ? "#d88a18" : "#168a68");
         document.getElementById('co').innerText = d.co;
         document.getElementById('humForecast').innerText = forecastHumValue !== null ? `${forecastHumValue.toFixed(1)}%` : '--';
         document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTempValue !== null ? `${forecastTempValue.toFixed(1)}°C` : '...'}`;
@@ -698,12 +736,12 @@ function fetchData() {
         requestCriticalAlert(Number(d.pm25));
 
         const pmHistory = chart.data.datasets[0].data;
-        const p30 = getPrediction(pmHistory, 600); 
-        const p2h = getPrediction(pmHistory, 2400); 
+        const p30 = d.forecast30 !== undefined ? d.forecast30 : getPrediction(pmHistory, 30);
+        const p2h = d.forecast2h !== undefined ? d.forecast2h : getPrediction(pmHistory, 120);
 
-        if(p30 && p2h) {
-            document.getElementById('forecast30').innerText = p30;
-            document.getElementById('forecastVal').innerText = p2h;
+        if(p30 !== null && p2h !== null) {
+            document.getElementById('forecast30').innerText = Number(p30).toFixed(1);
+            document.getElementById('forecastVal').innerText = Number(p2h).toFixed(1);
 
             let f2 = parseFloat(p2h);
             let trend = f2 > d.pm25 ? "📈 Rising" : "📉 Falling";
@@ -725,9 +763,16 @@ function fetchData() {
             chart.data.labels.shift(); 
             chart.data.datasets.forEach(dataset => dataset.data.shift());
         }
+        const pmValues = chart.data.datasets[0].data.map(value => Number(value)).filter(Number.isFinite);
+        const pmMaximum = pmValues.length ? Math.max(...pmValues) : 0;
+        chart.options.scales.y.suggestedMax = pmMaximum > 40
+            ? Math.ceil(pmMaximum / 50) * 50
+            : 40;
         chart.update('none');
 
-        let row = `<tr><td><b>${now}</b></td><td style="color:#b87512">${d.temp}°C</td><td>${d.hum}%</td><td>${d.pm25}</td><td>${d.co}</td><td style="color:${tColor}; font-weight:900;">${status}</td></tr>`;
+        const pmValue = parseFloat(d.pm25);
+        const pmColor = pmValue > 35 ? "#c43d4b" : (pmValue > 12 ? "#d88a18" : "#168a68");
+        let row = `<tr><td><b>${now}</b></td><td style="color:#b87512">${d.temp}°C</td><td>${d.hum}%</td><td style="color:${pmColor}; font-weight:900;">${pmValue.toFixed(1)}</td><td>${d.co}</td><td style="color:${tColor}; font-weight:900;">${status}</td></tr>`;
         document.getElementById('historyBody').insertAdjacentHTML("afterbegin", row);
         if(document.getElementById('historyBody').rows.length > 10) {
             document.getElementById('historyBody').deleteRow(10);

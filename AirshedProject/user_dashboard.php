@@ -515,6 +515,10 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
     let tempHistory = [];
     let humHistory = [];
     let predictionHistory = [];
+    let serverForecast30 = null;
+    let serverForecast2h = null;
+    let serverForecastTemp = null;
+    let serverForecastHum = null;
     let selectedForecastMinutes = 5;
     let predictionLocked = false;
     let offlineReadingShown = false;
@@ -611,9 +615,13 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         const pmHistoryData = pmHistory;
         const currentTemp = tempHistory.length ? tempHistory[tempHistory.length - 1] : null;
         const currentHum = humHistory.length ? humHistory[humHistory.length - 1] : null;
-        const forecast = getForecast(pmHistoryData, selectedForecastMinutes) ?? (pmHistoryData.length ? pmHistoryData[pmHistoryData.length - 1] : null);
-        const forecastTemp = getForecast(tempHistory, 5) ?? currentTemp;
-        const forecastHum = getForecast(humHistory, 5) ?? currentHum;
+        const forecast = (selectedForecastMinutes === 30 && serverForecast30 !== null)
+            ? serverForecast30
+            : ((selectedForecastMinutes === 120 && serverForecast2h !== null)
+                ? serverForecast2h
+                : (getForecast(pmHistoryData, selectedForecastMinutes) ?? (pmHistoryData.length ? pmHistoryData[pmHistoryData.length - 1] : null)));
+        const forecastTemp = serverForecastTemp !== null ? serverForecastTemp : (getForecast(tempHistory, 5) ?? currentTemp);
+        const forecastHum = serverForecastHum !== null ? serverForecastHum : (getForecast(humHistory, 5) ?? currentHum);
         const outlook = currentTemp !== null && currentHum !== null ? getWeatherOutlook(currentTemp, currentHum) : 'Pleasant';
 
         predictionSnapshot = { pm: forecast, hum: forecastHum, temp: forecastTemp, outlook };
@@ -646,7 +654,28 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
     const chart = new Chart(ctx, {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'PM2.5 (µg/m³)', data: [], borderColor: '#673ab7', borderWidth: 3, tension: 0.4 },
+            {
+                label: 'PM2.5 (µg/m³)',
+                data: [],
+                borderColor: '#168a68',
+                borderWidth: 3,
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: function(context) {
+                    const value = Number(context.raw);
+                    return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                },
+                pointBorderColor: function(context) {
+                    const value = Number(context.raw);
+                    return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                },
+                segment: {
+                    borderColor: function(context) {
+                        const value = Number(context.p1.raw);
+                        return value > 35 ? '#d32f2f' : (value > 12 ? '#d88a18' : '#168a68');
+                    }
+                }
+            },
             { label: 'Temperature (°C)', data: [], borderColor: '#ff7043', borderWidth: 2, tension: 0.4 },
             { label: 'Humidity (%)', data: [], borderColor: '#00a896', borderWidth: 2, tension: 0.4 },
             { label: 'Gas/MQ', data: [], borderColor: '#8e44ad', borderWidth: 2, tension: 0.4 }
@@ -656,6 +685,10 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
     function fetchData() {
         fetch('get_latest_data.php', { cache: 'no-store' }).then(res => res.json()).then(d => {
+            serverForecast30 = d.forecast30 !== undefined ? d.forecast30 : null;
+            serverForecast2h = d.forecast2h !== undefined ? d.forecast2h : null;
+            serverForecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : null;
+            serverForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
             if (d.live === false) {
                 predictionHistory = d.prediction_history || [];
                 tempHistory = predictionHistory.map(reading => Number(reading.temp));
@@ -691,7 +724,8 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
             document.getElementById('temp').innerText = d.temp;
             document.getElementById('hum').innerText = d.hum;
-            document.getElementById('pm25').innerText = d.pm25;
+            document.getElementById('pm25').innerText = val.toFixed(1);
+            document.getElementById('pm25').style.color = val > 35 ? "#d32f2f" : (val > 12 ? "#d88a18" : "#168a68");
             document.getElementById('co').innerText = d.co;
             let status = val > 35 ? "UNHEALTHY" : (val > 12 ? "MODERATE" : "EXCELLENT");
             let tColor = val > 35 ? "#ef5350" : (val > 12 ? "#ffa726" : "#00c853");
@@ -725,7 +759,8 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             chart.update();
 
             // Update History Table
-            let row = `<tr><td><b>${t}</b></td><td>${d.temp}°C</td><td><b>${val}</b></td><td style="color:${tColor}; font-weight:800;">${status}</td><td style="color:#16845b; font-weight:800;">ONLINE</td></tr>`;
+            const pmColor = val > 35 ? "#d32f2f" : (val > 12 ? "#d88a18" : "#168a68");
+            let row = `<tr><td><b>${t}</b></td><td>${d.temp}°C</td><td style="color:${pmColor}; font-weight:900;">${val.toFixed(1)}</td><td style="color:${tColor}; font-weight:800;">${status}</td><td style="color:#16845b; font-weight:800;">ONLINE</td></tr>`;
             document.getElementById('historyBody').insertAdjacentHTML('afterbegin', row);
             if(document.getElementById('historyBody').rows.length > 5) document.getElementById('historyBody').deleteRow(5);
 
