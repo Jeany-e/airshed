@@ -181,9 +181,6 @@ try {
         .resolve-btn:hover { opacity: 0.8; }
         .promote-btn { background: var(--ai-purple); color: #fff; border: 0; border-radius: 6px; padding: 7px 10px; font-size: 10px; font-weight: 800; cursor: pointer; }
         .promote-btn:hover { opacity: .85; }
-        .edit-name-btn { background: #fff; color: var(--ai-purple); border: 1px solid var(--ai-purple); border-radius: 6px; padding: 7px 10px; font-size: 10px; font-weight: 800; cursor: pointer; }
-        .edit-name-btn:hover { background: #eef4ff; }
-
         @media (max-width: 900px) {
             body { display: block; height: auto; min-height: 100vh; overflow: auto; }
             .sidebar {
@@ -762,7 +759,6 @@ try {
                             <td><?php echo $escapeHtml(date('M d, Y', strtotime($user['created_at'] ?? '') ?: 0)); ?></td>
                             <td>
                                 <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                                <button type="button" class="edit-name-btn" onclick="editAccountName(<?php echo htmlspecialchars(json_encode((string) ($user['id'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode((string) ($user['username'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>)">EDIT NAME</button>
                                 <?php if (($user['role'] ?? 'user') !== 'admin'): ?>
                                     <form method="POST" action="promote_user.php" onsubmit="return confirm('Make this user an administrator?');">
                                         <input type="hidden" name="id" value="<?php echo $escapeHtml($user['id'] ?? ''); ?>">
@@ -979,6 +975,33 @@ try {
     let predictionLastUpdatedAt = 0;
     let predictionWindowMs = 3000;
 
+    function formatAirshedDateTime(value) {
+        const date = value instanceof Date ? value : new Date(value);
+        if (!Number.isFinite(date.getTime())) return '--';
+        return date.toLocaleString('en-GB', {
+            timeZone: 'Asia/Manila',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    }
+
+    function formatAirshedTime(value) {
+        const date = value instanceof Date ? value : new Date(value);
+        if (!Number.isFinite(date.getTime())) return '--';
+        return date.toLocaleTimeString('en-GB', {
+            timeZone: 'Asia/Manila',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    }
+
     function switchView(id, btn) {
         document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active-view'));
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -1010,49 +1033,6 @@ try {
                 window.location.href = `update_status.php?id=${reportId}`;
             }
         })
-    }
-
-    function editAccountName(userId, currentName) {
-        Swal.fire({
-                title: 'Edit account name',
-                input: 'text',
-                inputLabel: 'Username',
-                inputValue: currentName,
-                inputAttributes: { maxlength: 50, autocapitalize: 'off' },
-                showCancelButton: true,
-                confirmButtonText: 'Save name',
-                confirmButtonColor: '#174ea6',
-                inputValidator: value => {
-                    if (!value || !value.trim()) return 'Please enter a username.';
-                    if (value.trim().length > 50) return 'Usernames may not exceed 50 characters.';
-                    return null;
-                }
-        }).then(result => {
-                if (!result.isConfirmed) return;
-
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = 'update_account_name.php';
-
-                const idInput = document.createElement('input');
-                idInput.type = 'hidden';
-                idInput.name = 'id';
-                idInput.value = userId;
-
-                const nameInput = document.createElement('input');
-                nameInput.type = 'hidden';
-                nameInput.name = 'username';
-                nameInput.value = result.value.trim();
-
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = 'csrf_token';
-                csrfInput.value = document.querySelector('meta[name="csrf-token"]').content;
-
-                form.append(idInput, nameInput, csrfInput);
-                document.body.appendChild(form);
-                form.submit();
-        });
     }
 
     const ctx = document.getElementById('pollutantChart').getContext('2d');
@@ -1250,7 +1230,7 @@ try {
                 document.getElementById('sideStatus').style.color = 'var(--danger)';
                 document.getElementById('netStatus').innerHTML = '<span style="color:var(--danger);">● Offline</span>';
                 if (!offlineReadingShown) {
-                    document.getElementById('historyBody').insertAdjacentHTML('afterbegin', `<tr><td><b>${new Date().toLocaleTimeString()}</b></td><td>--</td><td>--</td><td>--</td><td>--</td><td style="color:var(--danger); font-weight:bold;">OFFLINE</td><td style="color:var(--danger); font-weight:bold;">OFFLINE</td></tr>`);
+                    document.getElementById('historyBody').insertAdjacentHTML('afterbegin', `<tr><td><b>${formatAirshedDateTime(new Date())}</b></td><td>--</td><td>--</td><td>--</td><td>--</td><td style="color:var(--danger); font-weight:bold;">OFFLINE</td><td style="color:var(--danger); font-weight:bold;">OFFLINE</td></tr>`);
                     offlineReadingShown = true;
                 }
                 chart.data.labels = [];
@@ -1291,7 +1271,7 @@ try {
             document.getElementById('sideStatus').innerText = "Online";
             document.getElementById('sideStatus').style.color = "var(--accent)";
             document.getElementById('netStatus').innerHTML = `<span style="color:var(--accent);">● Online</span>`;
-            document.getElementById('lastSync').innerText = new Date().toLocaleTimeString();
+            document.getElementById('lastSync').innerText = formatAirshedTime(new Date());
 
             const advText = document.getElementById('advText');
             const advIcon = document.getElementById('advIcon');
@@ -1322,11 +1302,12 @@ try {
 
             const chartHistory = predictionHistory;
             const latestReading = chartHistory.length ? chartHistory[chartHistory.length - 1] : null;
-            let t = latestReading && latestReading.timestamp
-                ? new Date(latestReading.timestamp).toLocaleTimeString([], { hour12: false })
-                : new Date().toLocaleTimeString([], { hour12: false });
+            const readingTimestamp = latestReading && latestReading.timestamp ? latestReading.timestamp : null;
+            const t = readingTimestamp
+                ? formatAirshedDateTime(readingTimestamp)
+                : formatAirshedDateTime(new Date());
             chart.data.labels = chartHistory.map((reading, index) => reading.timestamp
-                ? new Date(reading.timestamp).toLocaleTimeString([], { hour12: false })
+                ? formatAirshedTime(reading.timestamp)
                 : `Reading ${index + 1}`);
             chart.data.datasets[0].data = chartHistory.map(reading => {
                 const value = reading.pm25 === null || reading.pm25 === undefined ? NaN : Number(reading.pm25);
@@ -1352,10 +1333,30 @@ try {
             chart.update('none');
 
             const pmColor = AirshedAirQuality.classifyPm25(pmValue).color;
-            let row = `<tr><td><b>${t}</b></td><td>${d.temp === null ? '--' : `${d.temp}°C`}</td><td>${d.hum === null ? '--' : `${d.hum}%`}</td><td style="color:${pmColor}; font-weight:900;">${pmValue === null ? '--' : pmValue.toFixed(1)}</td><td>${d.co === null ? '--' : d.co}</td><td style="color:${color}; font-weight:bold;">${status}</td><td style="color:var(--accent); font-weight:bold;">ONLINE</td></tr>`;
             const hBody = document.getElementById('historyBody');
-            hBody.insertAdjacentHTML("afterbegin", row);
-            if(hBody.rows.length > 15) hBody.deleteRow(15);
+            if (readingTimestamp && (!hBody.rows[0] || hBody.rows[0].dataset.timestamp !== readingTimestamp)) {
+                const row = hBody.insertRow(0);
+                row.dataset.timestamp = readingTimestamp;
+                [
+                    t,
+                    d.temp === null ? '--' : `${d.temp}°C`,
+                    d.hum === null ? '--' : `${d.hum}%`,
+                    pmValue === null ? '--' : pmValue.toFixed(1),
+                    d.co === null ? '--' : d.co,
+                    status,
+                    'ONLINE'
+                ].forEach(value => {
+                    row.insertCell().textContent = value;
+                });
+                row.cells[0].style.fontWeight = 'bold';
+                row.cells[3].style.color = pmColor;
+                row.cells[3].style.fontWeight = '900';
+                row.cells[5].style.color = color;
+                row.cells[5].style.fontWeight = 'bold';
+                row.cells[6].style.color = 'var(--accent)';
+                row.cells[6].style.fontWeight = 'bold';
+                if (hBody.rows.length > 15) hBody.deleteRow(15);
+            }
         })
         .catch(err => {
             console.error(err);
@@ -1373,7 +1374,7 @@ try {
     }
 
     setInterval(fetchData, 3000);
-    setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleString(), 1000);
+    setInterval(() => document.getElementById('clock').innerText = formatAirshedDateTime(new Date()), 1000);
 
     const userSearch = document.getElementById('userSearch');
     const roleFilter = document.getElementById('roleFilter');

@@ -520,7 +520,7 @@ include "config.php";
             <div class="table-scroll"><table>
                 <thead>
                     <tr>
-                        <th>Time</th>
+                        <th>Date &amp; time</th>
                         <th>Temp</th>
                         <th>Humidity</th>
                         <th>PM2.5</th>
@@ -539,6 +539,32 @@ let tempHistory = [];
 let humHistory = [];
 let lastAlertRequest = 0;
 let historyInitialized = false;
+
+function formatAirshedDateTime(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '--';
+    return date.toLocaleString('en-GB', {
+        timeZone: 'Asia/Manila',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+}
+
+function formatAirshedTime(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '--';
+    return date.toLocaleTimeString('en-GB', {
+        timeZone: 'Asia/Manila',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+}
 
 function requestCriticalAlert(pm25) {
     const now = Date.now();
@@ -577,7 +603,7 @@ function renderHistoryRows(history) {
         const classification = AirshedAirQuality.classifyPm25(pm25);
         const status = classification.label;
         const statusColor = classification.color;
-        const readingTime = reading.timestamp ? new Date(reading.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent';
+        const readingTime = reading.timestamp ? formatAirshedDateTime(reading.timestamp) : 'Recent';
         const humidity = Number(reading.hum);
         const co = reading.co === null || reading.co === undefined ? NaN : Number(reading.co);
         const humidityText = Number.isFinite(humidity) ? `${humidity.toFixed(1)}%` : '--';
@@ -647,7 +673,7 @@ function fetchData() {
                 const recentHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
             renderHistoryRows(recentHistory);
                 chart.data.labels = recentHistory.map((reading, index) => reading.timestamp
-                    ? new Date(reading.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    ? formatAirshedTime(reading.timestamp)
                     : `Reading ${index + 1}`);
                 chart.data.datasets[0].data = recentHistory.map(reading => reading.pm25 === null || reading.pm25 === undefined ? null : Number(reading.pm25));
                 chart.data.datasets[1].data = recentHistory.map(reading => reading.temp === null || reading.temp === undefined ? null : Number(reading.temp));
@@ -666,6 +692,8 @@ function fetchData() {
             return;
         }
 
+        const recentHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
+        renderHistoryRows(recentHistory);
         const currentTemp = parseFloat(d.temp);
         const currentHum = parseFloat(d.hum);
         if (!historyInitialized && Array.isArray(d.prediction_history)) {
@@ -730,7 +758,7 @@ function fetchData() {
             document.getElementById('aiInsight').innerText = AirshedAirQuality.forecastSummary(d.forecast_metrics && d.forecast_metrics.forecast2h, d.forecast_basis && d.forecast_basis.pm25_2h);
         }
 
-        let now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let now = formatAirshedTime(new Date());
         chart.data.labels.push(now);
         chart.data.datasets[0].data.push(pmValue);
         chart.data.datasets[1].data.push(d.temp);
@@ -746,16 +774,6 @@ function fetchData() {
             ? Math.ceil(pmMaximum / 50) * 50
             : 40;
         chart.update('none');
-
-        const pmColor = classification.color;
-        let row = `<tr><td><b>${now}</b></td><td style="color:#b87512">${d.temp === null ? '--' : `${d.temp}°C`}</td><td>${d.hum === null ? '--' : `${d.hum}%`}</td><td style="color:${pmColor}; font-weight:900;">${pmValue === null ? '--' : pmValue.toFixed(1)}</td><td>${d.co === null ? '--' : d.co}</td><td style="color:${tColor}; font-weight:900;">${status}</td></tr>`;
-        document.getElementById('historyBody').insertAdjacentHTML("afterbegin", row);
-        if(document.getElementById('historyBody').rows.length > 10) {
-            document.getElementById('historyBody').deleteRow(10);
-
-            document.getElementById('statusText').innerText = status;
-            document.getElementById('statusText').style.color = tColor;
-        }
 
     })
     .catch(err => {
@@ -773,7 +791,7 @@ function fetchData() {
 }
 
 setInterval(fetchData, 3000);
-setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleString(), 1000);
+setInterval(() => document.getElementById('clock').innerText = formatAirshedDateTime(new Date()), 1000);
 fetchData();
 </script>
 
