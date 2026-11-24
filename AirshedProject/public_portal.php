@@ -579,10 +579,10 @@ const chart = new Chart(ctx, {
     data: { 
         labels: [], 
         datasets: [
-            { label: 'PM2.5', data: [], borderColor: '#174ea6', borderWidth: 5, fill: true, tension: 0.4, yAxisID: 'y' },
+            { label: 'PM2.5', data: [], borderColor: '#c43d4b', backgroundColor: 'rgba(196, 61, 75, 0.12)', borderWidth: 5, fill: true, tension: 0.4, yAxisID: 'y' },
             { label: 'Temp', data: [], borderColor: '#d88a18', borderWidth: 3, borderDash: [5, 5], tension: 0.4, yAxisID: 'y1' },
             { label: 'Humidity', data: [], borderColor: '#0f9f86', borderWidth: 3, tension: 0.4, yAxisID: 'y1' },
-            { label: 'Gas/MQ', data: [], borderColor: '#2767b5', borderWidth: 3, tension: 0.4, yAxisID: 'y1' }
+            { label: 'Gas/MQ', data: [], borderColor: '#8e44ad', borderWidth: 3, tension: 0.4, yAxisID: 'y1' }
         ] 
     },
     options: { 
