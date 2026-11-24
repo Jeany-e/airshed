@@ -1163,7 +1163,7 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
                 return;
             }
             liveDataAvailable = true;
-            predictionHistory = [];
+            predictionHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
             offlineReadingShown = false;
             const currentTemp = parseFloat(d.temp);
             const currentHum = parseFloat(d.hum);
@@ -1218,13 +1218,30 @@ $alert_delivery_logs = array_slice($alert_delivery_logs, 0, 50);
 
             updatePredictionSnapshot(true);
 
-            let t = new Date().toLocaleTimeString([], { hour12: false });
-            chart.data.labels.push(t);
-            chart.data.datasets[0].data.push(d.pm25);
-            chart.data.datasets[1].data.push(d.temp);
-            chart.data.datasets[2].data.push(d.hum);
-            chart.data.datasets[3].data.push(d.co);
-            if(chart.data.labels.length > 12) { chart.data.labels.shift(); chart.data.datasets.forEach(dataset => dataset.data.shift()); }
+            const chartHistory = predictionHistory;
+            const latestReading = chartHistory.length ? chartHistory[chartHistory.length - 1] : null;
+            let t = latestReading && latestReading.timestamp
+                ? new Date(latestReading.timestamp).toLocaleTimeString([], { hour12: false })
+                : new Date().toLocaleTimeString([], { hour12: false });
+            chart.data.labels = chartHistory.map((reading, index) => reading.timestamp
+                ? new Date(reading.timestamp).toLocaleTimeString([], { hour12: false })
+                : `Reading ${index + 1}`);
+            chart.data.datasets[0].data = chartHistory.map(reading => {
+                const value = Number(reading.pm25);
+                return Number.isFinite(value) && value >= 0 && value <= 1000 ? value : null;
+            });
+            chart.data.datasets[1].data = chartHistory.map(reading => {
+                const value = Number(reading.temp);
+                return Number.isFinite(value) && value > 0 && value <= 60 ? value : null;
+            });
+            chart.data.datasets[2].data = chartHistory.map(reading => {
+                const value = Number(reading.hum);
+                return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+            });
+            chart.data.datasets[3].data = chartHistory.map(reading => {
+                const value = Number(reading.co);
+                return Number.isFinite(value) && value >= 0 ? value : null;
+            });
             const pmValues = chart.data.datasets[0].data.map(value => Number(value)).filter(Number.isFinite);
             const pmMaximum = pmValues.length ? Math.max(...pmValues) : 0;
             chart.options.scales.y.suggestedMax = pmMaximum > 40
