@@ -237,10 +237,24 @@ unset($generatorQuery['file_search']);
 $clearFileSearchUrl = $generatorQuery ? 'sensor_reports.php?' . http_build_query($generatorQuery) : 'sensor_reports.php';
 $filteredDays = $days;
 if ($recordFileSearch !== '') {
-    $filteredDays = array_filter($days, function ($readingCount, $day) use ($recordFileSearch) {
-        $haystack = strtolower(date('l, F j, Y', strtotime($day)) . ' ' . $day . ' ' . $readingCount);
-        return strpos($haystack, strtolower($recordFileSearch)) !== false;
-    }, ARRAY_FILTER_USE_BOTH);
+    $normalizedSearch = strtolower(preg_replace('/[^a-z0-9]/i', '', $recordFileSearch));
+    if ($normalizedSearch === '') {
+        $filteredDays = [];
+    } else {
+        $filteredDays = array_filter($days, function ($readingCount, $day) use ($normalizedSearch) {
+            $timestamp = strtotime($day);
+            $searchableText = implode(' ', [
+                date('l, F j, Y', $timestamp),
+                date('M j, Y', $timestamp),
+                date('Y-m-d', $timestamp),
+                date('n/j/Y', $timestamp),
+                date('m/d/Y', $timestamp),
+                (string) $readingCount
+            ]);
+            $normalizedText = strtolower(preg_replace('/[^a-z0-9]/i', '', $searchableText));
+            return strpos($normalizedText, $normalizedSearch) !== false;
+        }, ARRAY_FILTER_USE_BOTH);
+    }
 }
 $exportQuery = $generatorQuery;
 $exportQuery['export'] = 'csv';
