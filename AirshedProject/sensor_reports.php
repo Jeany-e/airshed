@@ -17,7 +17,7 @@ $requestedDate = trim($_GET['date'] ?? $_GET['day'] ?? '');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate) || !checkdate((int) substr($requestedDate, 5, 2), (int) substr($requestedDate, 8, 2), (int) substr($requestedDate, 0, 4))) {
     $requestedDate = '';
 }
-$searchTerm = trim($_GET['search'] ?? '');
+$recordFileSearch = trim($_GET['file_search'] ?? '');
 $fromInput = trim($_GET['from'] ?? '');
 $toInput = trim($_GET['to'] ?? '');
 $validDateInput = function ($value) {
@@ -129,7 +129,7 @@ try {
     } while ($pageCount >= $reportPageSize);
 
     krsort($days, SORT_STRING);
-    $selectedDate = $requestedDate ?: (array_key_first($days) ?: date('Y-m-d'));
+    $selectedDate = $requestedDate ?: ($fromInput ?: (array_key_first($days) ?: date('Y-m-d')));
     $rangeStartDate = $selectedDate;
     $rangeEndDate = $selectedDate;
     if ($period === 'weekly') {
@@ -157,27 +157,16 @@ try {
     if ($selectedSensor !== '' && !isset($sensors[$selectedSensor])) {
         $selectedSensor = '';
     }
-    $filterReportLogs = function (array $logs, $applySearch = true) use ($selectedSensor, $searchTerm) {
-        return array_values(array_filter($logs, function ($log) use ($selectedSensor, $searchTerm, $applySearch) {
+    $filterReportLogs = function (array $logs) use ($selectedSensor) {
+        return array_values(array_filter($logs, function ($log) use ($selectedSensor) {
             if ($selectedSensor !== '' && $log['sensor_id'] !== $selectedSensor) {
                 return false;
             }
-            $timestamp = strtotime($log['timestamp'] ?? '');
-            $haystack = strtolower(implode(' ', [
-                $log['timestamp'] ?? '',
-                $timestamp ? date('M d Y h:i A', $timestamp) : '',
-                $log['sensor_id'] ?? '',
-                $log['temp'] ?? '',
-                $log['hum'] ?? '',
-                $log['pm25'] ?? '',
-                $log['co'] ?? '',
-                $log['status'] ?? ''
-            ]));
-            return !$applySearch || $searchTerm === '' || strpos($haystack, strtolower($searchTerm)) !== false;
+            return true;
         }));
     };
     $selectedLogs = $filterReportLogs($selectedLogs);
-    $previousLogs = $filterReportLogs($previousLogs, false);
+    $previousLogs = $filterReportLogs($previousLogs);
 } catch (Throwable $exception) {
     error_log('Sensor report history unavailable: ' . $exception->getMessage());
     $error = 'Sensor history is temporarily unavailable.';
@@ -250,9 +239,21 @@ $reportPage = min($requestedReportPage, $totalReportPages);
 $firstReportRow = $totalReportRows ? (($reportPage - 1) * $displayPageSize) + 1 : 0;
 $lastReportRow = min($reportPage * $displayPageSize, $totalReportRows);
 $displayLogs = array_slice($selectedLogs, ($reportPage - 1) * $displayPageSize, $displayPageSize);
+$generatorFromDate = $period === 'custom' && $filterWarning ? $fromInput : $rangeStartDate;
+$generatorToDate = $period === 'custom' && $filterWarning ? $toInput : $rangeEndDate;
 $reportQuery = $_GET;
-unset($reportQuery['export'], $reportQuery['report_page']);
-$exportQuery = $reportQuery;
+unset($reportQuery['export'], $reportQuery['report_page'], $reportQuery['search']);
+$generatorQuery = $reportQuery;
+unset($generatorQuery['file_search']);
+$clearFileSearchUrl = $generatorQuery ? 'sensor_reports.php?' . http_build_query($generatorQuery) : 'sensor_reports.php';
+$filteredDays = $days;
+if ($recordFileSearch !== '') {
+    $filteredDays = array_filter($days, function ($readingCount, $day) use ($recordFileSearch) {
+        $haystack = strtolower(date('l, F j, Y', strtotime($day)) . ' ' . $day . ' ' . $readingCount);
+        return strpos($haystack, strtolower($recordFileSearch)) !== false;
+    }, ARRAY_FILTER_USE_BOTH);
+}
+$exportQuery = $generatorQuery;
 $exportQuery['export'] = 'csv';
 $exportUrl = 'sensor_reports.php?' . http_build_query($exportQuery);
 $reportPageUrl = function ($page) use ($reportQuery) {
@@ -315,6 +316,9 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         .intro p { color: var(--muted); margin: 10px 0 0; max-width: 620px; line-height: 1.55; }
         .date-form { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .date-form label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .record-file-search { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid var(--line); }
+        .record-file-search label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .record-file-search input[type="search"] { min-width: 220px; }
         select, input { border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); padding: 9px 10px; font: inherit; }
         .search-btn { border: 0; border-radius: 8px; padding: 10px 14px; background: var(--blue); color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
         .clear-search { color: var(--muted); font-size: 12px; font-weight: 700; text-decoration: none; }
@@ -344,6 +348,8 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         .record-files { margin-top: 24px; margin-bottom: 24px; }
         .record-files .panel-head { flex-wrap: wrap; }
         .record-files .date-form { width: 100%; border: 0; border-radius: 0; border-top: 1px solid var(--line); padding: 16px 22px; }
+        .record-files .date-form .search-btn { width: auto; }
+        .report-period-help { margin: 0; padding: 0 22px 14px; color: var(--muted); font-size: 12px; }
         .record-files .table-wrap { max-height: 260px; overflow-y: auto; animation: tableFloat 7s ease-in-out 1s infinite; }
         .record-files table { min-width: 0; }
         .view-date { display: inline-block; padding: 7px 11px; border-radius: 8px; background: var(--blue-soft); color: var(--blue); text-decoration: none; font-size: 12px; font-weight: 700; }
@@ -399,6 +405,8 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             .date-form { justify-content: space-between; }
             .date-form select, .date-form input { flex: 1; min-width: 0; }
             .date-form .search-btn { width: 100%; }
+            .record-file-search { display: grid; grid-template-columns: 1fr; gap: 8px; }
+            .record-file-search input, .record-file-search .search-btn { width: 100%; min-width: 0; }
             .summary { grid-template-columns: repeat(2, 1fr); gap: 10px; }
             .metric { padding: 16px; }
             .metric-value { font-size: 25px; }
@@ -523,7 +531,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         }
         @media print {
             body { background: #fff; animation: none; }
-            .sidebar, .header, .mobile-menu-toggle, .sidebar-backdrop, .date-form, .panel-actions, .report-pagination, .record-files { display: none !important; }
+            .sidebar, .header, .mobile-menu-toggle, .sidebar-backdrop,             .date-form, .record-file-search, .panel-actions, .report-pagination, .record-files { display: none !important; }
             .app-shell, .main, .main main { display: block; width: 100%; margin: 0; }
             .main main { padding: 12px; }
             .metric, .panel { box-shadow: none; animation: none; break-inside: avoid; }
@@ -617,7 +625,6 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                     <div class="panel-actions">
                         <span><?php echo number_format($totalReportRows); ?> matching readings</span>
                         <?php if ($selectedLogs): ?>
-                            <a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Export CSV</a>
                             <button type="button" class="export-btn" onclick="window.print()">Print</button>
                         <?php endif; ?>
                     </div>
@@ -660,17 +667,15 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                 </div>
                 <form class="date-form" method="get">
                     <label for="period">Report period</label>
-                    <select id="period" name="period" onchange="toggleCustomDates()">
+                    <select id="period" name="period" onchange="updateReportDateRange()">
                         <?php foreach (['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'custom' => 'Custom range'] as $periodValue => $periodLabel): ?>
                             <option value="<?php echo $periodValue; ?>" <?php echo $period === $periodValue ? 'selected' : ''; ?>><?php echo $periodLabel; ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <label for="date">Date</label>
-                    <input id="date" name="date" type="date" value="<?php echo htmlspecialchars($selectedDate); ?>" aria-label="Date used for daily, weekly, or monthly report">
-                    <span class="custom-date-field"><label for="from">From</label>
-                    <input id="from" name="from" type="date" value="<?php echo htmlspecialchars($fromInput); ?>" aria-label="Custom report start date"></span>
-                    <span class="custom-date-field"><label for="to">To</label>
-                    <input id="to" name="to" type="date" value="<?php echo htmlspecialchars($toInput); ?>" aria-label="Custom report end date"></span>
+                    <label for="from">From date</label>
+                    <input id="from" name="from" type="date" value="<?php echo htmlspecialchars($generatorFromDate); ?>" aria-label="Report start date" onchange="updateReportDateRange()" required>
+                    <label for="to">To date</label>
+                    <input id="to" name="to" type="date" value="<?php echo htmlspecialchars($generatorToDate); ?>" aria-label="Report end date" required <?php echo $period === 'custom' ? '' : 'readonly'; ?>>
                     <label for="pollutant">Pollutant</label>
                     <select id="pollutant" name="pollutant">
                         <?php foreach ($pollutantFields as $pollutantValue => $fieldDetails): ?>
@@ -685,28 +690,39 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                             <option value="<?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" <?php echo $selectedSensor === $sensorId ? 'selected' : ''; ?>><?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <input name="search" type="search" placeholder="Search time or value" value="<?php echo htmlspecialchars($searchTerm); ?>" aria-label="Search sensor records">
-                    <button class="search-btn" type="submit">Search</button>
-                    <a class="clear-search" href="sensor_reports.php">Clear filters</a>
+                    <button class="search-btn" type="submit">Generate Report</button>
+                    <?php if ($selectedLogs): ?><a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Export CSV</a><?php endif; ?>
                 </form>
+                <p class="report-period-help">Daily covers one day; weekly covers Monday–Sunday; monthly covers the full calendar month. Custom range uses the dates entered.</p>
                 <?php $hasIdentifiedSensors = count(array_diff(array_keys($sensors), ['Unidentified sensor'])) > 0; ?>
                 <?php if (!$hasIdentifiedSensors): ?>
                     <p class="sidebar-note" style="margin:0 22px 16px;">
                         Current readings have no sensor ID; they are grouped as “Unidentified sensor.” Configure a sensor ID to enable accurate filtering for new readings.
                     </p>
                 <?php endif; ?>
+                <form class="record-file-search" method="get">
+                    <input type="hidden" name="period" value="<?php echo htmlspecialchars($period); ?>">
+                    <input type="hidden" name="from" value="<?php echo htmlspecialchars($generatorFromDate); ?>">
+                    <input type="hidden" name="to" value="<?php echo htmlspecialchars($generatorToDate); ?>">
+                    <input type="hidden" name="pollutant" value="<?php echo htmlspecialchars($pollutant); ?>">
+                    <input type="hidden" name="sensor" value="<?php echo htmlspecialchars($selectedSensor); ?>">
+                    <label for="file-search">Search Record Files</label>
+                    <input id="file-search" name="file_search" type="search" placeholder="Search date or reading count" value="<?php echo htmlspecialchars($recordFileSearch); ?>">
+                    <button class="search-btn" type="submit">Search Files</button>
+                    <?php if ($recordFileSearch): ?><a class="clear-search" href="<?php echo htmlspecialchars($clearFileSearchUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Clear search</a><?php endif; ?>
+                </form>
                 <div class="table-wrap">
                     <table>
                         <thead><tr><th>Date</th><th>Readings</th><th>Action</th></tr></thead>
                         <tbody>
-                        <?php if (!$days): ?>
-                            <tr><td colspan="3">No record files available.</td></tr>
+                        <?php if (!$filteredDays): ?>
+                            <tr><td colspan="3"><?php echo $days ? 'No record files match that search.' : 'No record files available.'; ?></td></tr>
                         <?php else: ?>
-                            <?php foreach ($days as $day => $dayReadingCount): ?>
+                            <?php foreach ($filteredDays as $day => $dayReadingCount): ?>
                                 <tr>
                                     <td><?php echo date('l, F j, Y', strtotime($day)); ?></td>
                                     <td><?php echo number_format($dayReadingCount); ?></td>
-                                    <td><a class="view-date" href="sensor_reports.php?period=daily&amp;date=<?php echo urlencode($day); ?>">View records</a></td>
+                                    <td><a class="view-date" href="sensor_reports.php?period=daily&amp;from=<?php echo urlencode($day); ?>&amp;to=<?php echo urlencode($day); ?>">View records</a></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -738,15 +754,40 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             if (event.key === 'Escape') closeMobileSidebar();
         });
 
-        function toggleCustomDates() {
-            const isCustom = document.getElementById('period').value === 'custom';
-            document.querySelectorAll('.custom-date-field').forEach(field => {
-                field.style.display = isCustom ? 'contents' : 'none';
-            });
-            document.getElementById('from').required = isCustom;
-            document.getElementById('to').required = isCustom;
+        function formatLocalDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
-        toggleCustomDates();
+
+        function updateReportDateRange() {
+            const period = document.getElementById('period').value;
+            const fromInput = document.getElementById('from');
+            const toInput = document.getElementById('to');
+            const customRange = period === 'custom';
+            fromInput.required = true;
+            toInput.required = true;
+            fromInput.readOnly = false;
+            toInput.readOnly = !customRange;
+            if (customRange || !fromInput.value) return;
+
+            const start = new Date(`${fromInput.value}T12:00:00`);
+            if (Number.isNaN(start.getTime())) return;
+            let rangeStart = new Date(start);
+            let rangeEnd = new Date(start);
+            if (period === 'weekly') {
+                rangeStart.setDate(rangeStart.getDate() - ((rangeStart.getDay() + 6) % 7));
+                rangeEnd = new Date(rangeStart);
+                rangeEnd.setDate(rangeStart.getDate() + 6);
+            } else if (period === 'monthly') {
+                rangeStart = new Date(start.getFullYear(), start.getMonth(), 1, 12);
+                rangeEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0, 12);
+            }
+            fromInput.value = formatLocalDate(rangeStart);
+            toInput.value = formatLocalDate(rangeEnd);
+        }
+        updateReportDateRange();
 
         const chartLabels = <?php echo json_encode($trendLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
         const chartValues = <?php echo json_encode($trendValues, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
