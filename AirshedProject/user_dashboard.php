@@ -114,13 +114,15 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         .history-card { background: #fff; padding: 20px; border-radius: 15px; margin-top: 25px; border: 1px solid #c9e4f2; box-shadow: 0 14px 30px rgba(36,104,157,0.14); animation: panelFloat 5.5s ease-in-out .8s infinite; }
         .history-table-wrap { max-height: min(42vh, 360px); overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .chart-scroll { width: 100%; overflow-x: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-        .chart-track { width: 1200px; height: 260px; }
-        .chart-track canvas { display: block; width: 1200px !important; height: 260px !important; max-width: none; }
+        .chart-track { position: relative; width: 100%; min-width: 600px; height: 260px; }
+        .chart-track canvas { display: block; width: 100% !important; height: 260px !important; max-width: none; }
         .chart-card { background: #fff; padding: 24px 28px 28px; border-radius: 30px; }
         .chart-heading { margin: 0 0 14px; color: var(--primary); font-size: 18px; font-weight: 800; }
-        .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 12px; color: #5f677a; font-size: 12px; font-weight: 700; }
-        .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; }
-        .chart-legend-line { width: 22px; height: 3px; border-radius: 3px; }
+        .chart-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+        .chart-controls { display: flex; flex-wrap: wrap; gap: 7px; }
+        .chart-control-button { padding: 8px 12px; border: 1px solid #c9e4f2; border-radius: 999px; background: #eef8ff; color: #38566e; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .chart-control-button.active { border-color: var(--primary); background: var(--primary); color: #fff; }
+        .chart-status { min-height: 16px; margin: 0 0 8px; color: #64748b; font-size: 11px; }
         .guide-card { background: #fff; padding: 22px; border-radius: 18px; border: 1px solid #c9e4f2; box-shadow: 0 14px 30px rgba(36,104,157,0.16), 0 3px 0 rgba(255,255,255,0.9) inset; margin-bottom: 25px; animation: panelFloat 5.5s ease-in-out 1.1s infinite; }
         .guide-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--primary); }
         .guide-card p { margin: 0 0 14px; color: #5f677a; font-size: 14px; }
@@ -379,7 +381,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">TEMP</label><span class="val" id="temp">--</span><span>°C</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">HUMIDITY</label><span class="val" id="hum">--</span><span>%</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">PM2.5</label><span class="val" id="pm25" style="color:var(--ai-purple);">--</span><span>µg/m³</span></div>
-                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">MQ SENSOR · RAW ADC</label><span class="val" id="co">--</span><span>Not calibrated CO ppm</span></div>
+                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">MQ-7 CO SENSOR</label><span class="val" id="co">--</span><span>Raw signal · ADC counts</span></div>
                 </div>
                 
                 <div class="ai-panel">
@@ -435,7 +437,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
                 <ul class="guide-list">
                     <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. The Airshed dashboard display bands are 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. These are not a claim of official AQI certification; confirm applicable thresholds with local health or environmental authorities.</li>
-                    <li><strong>MQ sensor</strong>: The raw analog value is not calibrated CO ppm. Do not use it as a CO safety measurement; use a properly calibrated gas monitor for safety decisions.</li>
+                    <li><strong>MQ-7 CO sensor</strong>: The displayed value is its raw ADC signal, not CO ppm. It needs calibration before it can estimate concentration; do not use it as a CO safety measurement.</li>
                     <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
                     <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
                     <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the dashboard has no live reading to display.</li>
@@ -444,12 +446,19 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
             <div class="chart-card">
                 <h3 class="chart-heading">SENSOR TREND HISTORY</h3>
-                <div class="chart-legend" aria-label="Sensor chart legend">
-                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#673ab7;"></span>PM2.5 (µg/m³)</span>
-                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#ff7043;"></span>Temperature (°C)</span>
-                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#00a896;"></span>Humidity (%)</span>
-                    <span class="chart-legend-item"><span class="chart-legend-line" style="background:#8e44ad;"></span>MQ Gas (raw ADC)</span>
+                <div class="chart-toolbar">
+                    <div class="chart-controls" role="group" aria-label="Choose chart measurement">
+                        <button type="button" class="chart-control-button active" data-chart-metric="pm25" aria-pressed="true">PM2.5</button>
+                        <button type="button" class="chart-control-button" data-chart-metric="temp" aria-pressed="false">Temperature</button>
+                        <button type="button" class="chart-control-button" data-chart-metric="hum" aria-pressed="false">Humidity</button>
+                        <button type="button" class="chart-control-button" data-chart-metric="co" aria-pressed="false">MQ-7 signal</button>
+                    </div>
+                    <div class="chart-controls" role="group" aria-label="Choose chart time range">
+                        <button type="button" class="chart-control-button active" data-chart-window="1h" aria-pressed="true">1 hour</button>
+                        <button type="button" class="chart-control-button" data-chart-window="24h" aria-pressed="false">24 hours</button>
+                    </div>
                 </div>
+                <p id="chartStatus" class="chart-status" role="status">Loading chart history...</p>
                 <div class="chart-scroll"><div class="chart-track"><canvas id="pollutantChart" width="1200" height="260"></canvas></div></div>
             </div>
             
@@ -676,8 +685,14 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
 
         if (forecast !== null && pmHistoryData.length >= 3 && Number.isFinite(pmHistoryData[pmHistoryData.length - 1])) {
             const currentPm25 = pmHistoryData[pmHistoryData.length - 1];
-            const trend = forecast > currentPm25 ? '📈 Rising' : '📉 Falling';
-            const advice = forecast > currentPm25 ? '🚨 Worsening. Close windows and wear a mask.' : '✅ Improving. Good time for outdoor activities!';
+            const change = forecast - currentPm25;
+            const isStable = Math.abs(change) < 0.5;
+            const trend = isStable ? '➖ Stable' : (change > 0 ? '📈 Rising' : '📉 Falling');
+            const advice = isStable
+                ? 'No meaningful change predicted. Follow current air-quality guidance.'
+                : (change > 0
+                    ? '🚨 Worsening. Reduce outdoor exposure and follow local guidance.'
+                    : '✅ Improving. Check current air-quality guidance before outdoor activity.');
             document.getElementById('aiInsight').innerHTML = `<b>Trend:</b> ${trend}<br>${advice}<br><b>Weather:</b> ${outlook} with humidity forecast at ${forecastHum !== null ? `${forecastHum.toFixed(1)}%` : '--'}.`;
         } else {
             document.getElementById('aiInsight').innerText = AirshedAirQuality.forecastSummary(
@@ -698,34 +713,143 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         updatePredictionSnapshot(true);
     }
 
+    let chartHistory = [];
+    let selectedChartMetric = 'pm25';
+    let selectedChartWindow = '1h';
+    let chartHistoryRequestId = 0;
+    const chartMetrics = {
+        pm25: { field: 'pm25', label: 'PM2.5 (µg/m³)', color: '#168a68' },
+        temp: { field: 'temp', label: 'Temperature (°C)', color: '#ff7043' },
+        hum: { field: 'hum', label: 'Humidity (%)', color: '#00a896' },
+        co: { field: 'co', label: 'MQ-7 signal (ADC counts)', color: '#8e44ad' }
+    };
     const ctx = document.getElementById('pollutantChart').getContext('2d');
     const chart = new Chart(ctx, {
         type: 'line',
-        data: { labels: [], datasets: [
-            {
-                label: 'PM2.5 (µg/m³)',
-                data: [],
-                borderColor: '#168a68',
-                borderWidth: 3,
-                tension: 0.4,
-                pointRadius: 4,
-                pointBackgroundColor: function(context) {
-                    return AirshedAirQuality.classifyPm25(context.raw).color;
-                },
-                pointBorderColor: function(context) {
-                    return AirshedAirQuality.classifyPm25(context.raw).color;
-                },
-                segment: {
-                    borderColor: function(context) {
-                        return AirshedAirQuality.classifyPm25(context.p1.raw).color;
-                    }
+        data: { labels: [], datasets: [{
+            label: chartMetrics.pm25.label,
+            data: [],
+            borderColor: chartMetrics.pm25.color,
+            borderWidth: 3,
+            tension: 0.25,
+            pointRadius: 2,
+            pointBackgroundColor: context => AirshedAirQuality.classifyPm25(context.raw).color,
+            pointBorderColor: context => AirshedAirQuality.classifyPm25(context.raw).color,
+            segment: {
+                borderColor: context => AirshedAirQuality.classifyPm25(context.p1.raw).color
+            }
+        }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 8 } },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: chartMetrics.pm25.label }
                 }
-            },
-            { label: 'Temperature (°C)', data: [], borderColor: '#ff7043', borderWidth: 2, tension: 0.4 },
-            { label: 'Humidity (%)', data: [], borderColor: '#00a896', borderWidth: 2, tension: 0.4 },
-            { label: 'MQ Gas (raw ADC)', data: [], borderColor: '#8e44ad', borderWidth: 2, tension: 0.4 }
-        ] },
-        options: { responsive: false, maintainAspectRatio: false, plugins: { legend: { display: true } } }
+            }
+        }
+    });
+
+    function renderUserChart() {
+        const metric = chartMetrics[selectedChartMetric];
+        const dataset = chart.data.datasets[0];
+        dataset.label = metric.label;
+        dataset.data = chartHistory.map(reading => {
+            const value = reading[metric.field];
+            return value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value);
+        });
+        dataset.borderColor = metric.color;
+        dataset.pointBackgroundColor = context => selectedChartMetric === 'pm25'
+            ? AirshedAirQuality.classifyPm25(context.raw).color
+            : metric.color;
+        dataset.pointBorderColor = dataset.pointBackgroundColor;
+        dataset.segment = {
+            borderColor: context => selectedChartMetric === 'pm25'
+                ? AirshedAirQuality.classifyPm25(context.p1.raw).color
+                : metric.color
+        };
+        chart.data.labels = chartHistory.map(reading => {
+            const timestamp = new Date(reading.timestamp);
+            if (!Number.isFinite(timestamp.getTime())) return '--';
+            const options = selectedChartWindow === '24h'
+                ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+                : { hour: '2-digit', minute: '2-digit', hour12: false };
+            return timestamp.toLocaleString('en-GB', { ...options, timeZone: 'Asia/Manila' });
+        });
+        chart.options.scales.y.beginAtZero = selectedChartMetric !== 'temp';
+        chart.options.scales.y.title.text = metric.label;
+        chart.update();
+    }
+
+    function mergeUserChartHistory(readings) {
+        if (!Array.isArray(readings)) return;
+        const readingsByTimestamp = new Map();
+        chartHistory.forEach(reading => {
+            const timestamp = Date.parse(reading.timestamp);
+            if (Number.isFinite(timestamp)) readingsByTimestamp.set(timestamp, reading);
+        });
+        readings.forEach(reading => {
+            const timestamp = Date.parse(reading.timestamp);
+            if (Number.isFinite(timestamp)) readingsByTimestamp.set(timestamp, reading);
+        });
+        const windowMs = selectedChartWindow === '24h' ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+        const cutoff = Date.now() - windowMs;
+        chartHistory = Array.from(readingsByTimestamp.entries())
+            .filter(([timestamp]) => timestamp >= cutoff)
+            .sort((a, b) => a[0] - b[0])
+            .slice(-5000)
+            .map(([, reading]) => reading);
+        renderUserChart();
+    }
+
+    document.querySelectorAll('[data-chart-metric]').forEach(button => {
+        button.addEventListener('click', () => {
+            selectedChartMetric = button.dataset.chartMetric;
+            document.querySelectorAll('[data-chart-metric]').forEach(metricButton => {
+                const active = metricButton === button;
+                metricButton.classList.toggle('active', active);
+                metricButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            renderUserChart();
+        });
+    });
+
+    function loadChartWindow(windowName) {
+        if (windowName !== '1h' && windowName !== '24h') return;
+        selectedChartWindow = windowName;
+        chartHistory = [];
+        renderUserChart();
+        document.querySelectorAll('[data-chart-window]').forEach(button => {
+            const active = button.dataset.chartWindow === windowName;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        const requestId = ++chartHistoryRequestId;
+        const status = document.getElementById('chartStatus');
+        status.innerText = `Loading ${windowName === '1h' ? '1-hour' : '24-hour'} chart history...`;
+        fetch(`get_latest_data.php?history_window=${encodeURIComponent(windowName)}`, { cache: 'no-store' })
+            .then(response => {
+                if (!response.ok) throw new Error(`Chart history request failed (${response.status})`);
+                return response.json();
+            })
+            .then(data => {
+                if (requestId !== chartHistoryRequestId) return;
+                mergeUserChartHistory(data.prediction_history);
+                status.innerText = `Showing ${windowName === '1h' ? '1-hour' : '24-hour'} sensor history.`;
+            })
+            .catch(error => {
+                if (requestId !== chartHistoryRequestId) return;
+                console.error(error);
+                status.innerText = 'Could not load chart history. Recent readings may still appear.';
+            });
+    }
+
+    document.querySelectorAll('[data-chart-window]').forEach(button => {
+        button.addEventListener('click', () => loadChartWindow(button.dataset.chartWindow));
     });
 
     function fetchData() {
@@ -758,6 +882,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 const lastReading = latestSensorTimestamp ? AirshedAirQuality.formatManilaDateTime(latestSensorTimestamp) : 'time unavailable';
                 document.getElementById('syncStatus').innerText = `Device offline · Last sensor reading ${lastReading}`;
                 document.getElementById('syncStatus').style.color = '#d32f2f';
+                mergeUserChartHistory(predictionHistory);
                 updatePredictionSnapshot(true);
                 return;
             }
@@ -815,25 +940,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             document.getElementById('predict2hMeta').innerText = AirshedAirQuality.forecastDetails(latestSensorTimestamp, 120, forecastMetrics.forecast2h);
 
             // Render actual device timestamps so frequent polling does not duplicate points.
-            const chartHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
-            chart.data.labels = chartHistory.map(reading => {
-                const timestamp = new Date(reading.timestamp);
-                return Number.isFinite(timestamp.getTime())
-                    ? timestamp.toLocaleTimeString('en-GB', {
-                        timeZone: 'Asia/Manila',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    })
-                    : '--';
-            });
-            chart.data.datasets[0].data = chartHistory.map(reading => reading.pm25);
-            chart.data.datasets[1].data = chartHistory.map(reading => reading.temp);
-            chart.data.datasets[2].data = chartHistory.map(reading => reading.hum);
-            chart.data.datasets[3].data = chartHistory.map(reading => reading.co);
-            chart.update();
-
+            mergeUserChartHistory(d.prediction_history);
             renderUserHistory(chartHistory, true);
 
         }).catch(err => {
@@ -848,6 +955,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         });
     }
 
+    loadChartWindow(selectedChartWindow);
     setInterval(fetchData, 3000);
     setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleString(), 1000);
     fetchData();
