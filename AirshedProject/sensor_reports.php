@@ -205,24 +205,34 @@ $highReadings = array_values(array_filter($selectedLogs, function ($log) {
 usort($highReadings, function ($a, $b) {
     return strcmp($a['timestamp'] ?? '', $b['timestamp'] ?? '');
 });
-$trendBuckets = [];
+$reportMetrics = [
+    'pm25' => ['field' => 'pm25', 'label' => 'PM2.5', 'unit' => 'µg/m³', 'minimum' => 0, 'maximum' => 1000, 'category' => true],
+    'temp' => ['field' => 'temp', 'label' => 'Temperature', 'unit' => '°C', 'minimum' => -40, 'maximum' => 85, 'category' => false],
+    'hum' => ['field' => 'hum', 'label' => 'Humidity', 'unit' => '%', 'minimum' => 0, 'maximum' => 100, 'category' => false],
+    'co' => ['field' => 'co', 'label' => 'MQ-7 signal (raw ADC)', 'unit' => 'raw ADC', 'minimum' => 0, 'maximum' => 4095, 'category' => false]
+];
+$trendBuckets = array_fill_keys(array_keys($reportMetrics), []);
 foreach ($selectedLogs as $log) {
     $timestamp = strtotime($log['timestamp'] ?? '');
     if (!$timestamp) {
         continue;
     }
     $bucketKey = $period === 'daily' ? date('Y-m-d H:00', $timestamp) : date('Y-m-d', $timestamp);
-    $value = $log['pm25'] ?? null;
-    if (is_numeric($value) && is_finite((float) $value) && (float) $value >= 0 && (float) $value <= 1000) {
-        $trendBuckets[$bucketKey][] = (float) $value;
+    foreach ($reportMetrics as $metricKey => $metric) {
+        $value = $log[$metric['field']] ?? null;
+        if (is_numeric($value) && is_finite((float) $value) && (float) $value >= $metric['minimum'] && (float) $value <= $metric['maximum']) {
+            $trendBuckets[$metricKey][$bucketKey][] = (float) $value;
+        }
     }
 }
-$trendLabels = [];
-$trendValues = [];
-ksort($trendBuckets);
-foreach ($trendBuckets as $bucket => $values) {
-    $trendLabels[] = $period === 'daily' ? date('h A', strtotime($bucket . ':00')) : date('M j', strtotime($bucket));
-    $trendValues[] = array_sum($values) / count($values);
+$trendSeries = [];
+foreach ($trendBuckets as $metricKey => $buckets) {
+    ksort($buckets);
+    $trendSeries[$metricKey] = ['labels' => [], 'values' => []];
+    foreach ($buckets as $bucket => $values) {
+        $trendSeries[$metricKey]['labels'][] = $period === 'daily' ? date('h A', strtotime($bucket . ':00')) : date('M j', strtotime($bucket));
+        $trendSeries[$metricKey]['values'][] = array_sum($values) / count($values);
+    }
 }
 $reportTitle = $period === 'daily'
     ? date('l, F j, Y', strtotime($rangeStartDate))
@@ -378,7 +388,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         .report-generator-form { margin: 0 22px 12px; }
         .report-generator-form .search-btn { min-height: 40px; white-space: nowrap; }
         .report-period-help { margin: 0; padding: 0 22px 14px; color: var(--muted); font-size: 12px; }
-        .report-metric-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 0 22px 14px; }
+        .report-metric-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 14px; }
         .report-metric-tab { flex: 0 0 auto; padding: 9px 14px; border: 1px solid var(--line); border-radius: 999px; background: #f9fbfe; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
         .report-metric-tab[aria-pressed="true"] { border-color: var(--blue); background: var(--blue); color: #fff; }
         .report-metric-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
@@ -640,14 +650,20 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             <section class="panel chart-panel">
                 <div class="panel-head" style="padding: 0 0 18px; border-bottom: 0;">
                     <div>
-                        <h2><?php echo htmlspecialchars(ucfirst($period)); ?> PM2.5 Trend</h2>
+                        <h2 id="reportChartTitle"><?php echo htmlspecialchars(ucfirst($period)); ?> PM2.5 Trend</h2>
                         <span>Daily reports show hourly averages; longer reports show daily averages.</span>
                     </div>
                 </div>
-                <?php if ($trendLabels): ?>
-                    <div class="chart-scroll"><div class="chart-wrap"><canvas id="reportChart"></canvas></div></div>
+                <?php if ($selectedLogs): ?>
+                    <div class="report-metric-tabs" role="group" aria-label="Select measurement shown in the graph and readings table">
+                        <?php foreach ($reportMetrics as $metricKey => $metric): ?>
+                            <button class="report-metric-tab" type="button" data-report-metric="<?php echo htmlspecialchars($metricKey, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" aria-pressed="<?php echo $metricKey === 'pm25' ? 'true' : 'false'; ?>"><?php echo htmlspecialchars($metricKey === 'co' ? 'MQ-7 (raw ADC)' : $metric['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                    <div id="reportChartEmpty" class="empty" hidden>No valid measurements are available for this metric in the selected report.</div>
+                    <div id="reportChartScroll" class="chart-scroll"><div class="chart-wrap"><canvas id="reportChart"></canvas></div></div>
                 <?php else: ?>
-                    <div class="empty">No valid PM2.5 measurements are available in this report.</div>
+                    <div class="empty">No sensor readings match the selected report filters.</div>
                 <?php endif; ?>
             </section>
 
@@ -693,12 +709,6 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                 <?php if (!$selectedLogs): ?>
                     <div class="empty">No sensor readings match the selected report filters.</div>
                 <?php else: ?>
-                    <div class="report-metric-tabs" role="group" aria-label="Select measurement shown in the readings table">
-                        <button class="report-metric-tab" type="button" data-report-metric="pm25" aria-pressed="true">PM2.5</button>
-                        <button class="report-metric-tab" type="button" data-report-metric="temp" aria-pressed="false">Temperature</button>
-                        <button class="report-metric-tab" type="button" data-report-metric="hum" aria-pressed="false">Humidity</button>
-                        <button class="report-metric-tab" type="button" data-report-metric="co" aria-pressed="false">MQ-7 (raw ADC)</button>
-                    </div>
                     <div class="table-wrap">
                         <table>
                             <thead><tr><th>Date and time</th><th>Sensor</th><th id="readingMetricHeader">PM2.5 (µg/m³)</th><th id="pm25CategoryHeader">PM2.5 category</th></tr></thead>
@@ -840,52 +850,76 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             fromInput.value = formatLocalDate(rangeStart);
             toInput.value = formatLocalDate(rangeEnd);
         }
-        const chartLabels = <?php echo json_encode($trendLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
-        const chartValues = <?php echo json_encode($trendValues, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+        const reportTrendSeries = <?php echo json_encode($trendSeries, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+        const reportPeriodLabel = <?php echo json_encode(ucfirst($period), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
         const reportMetricConfig = {
-            pm25: { heading: 'PM2.5 (µg/m³)', hasCategory: true },
-            temp: { heading: 'Temperature (°C)', hasCategory: false },
-            hum: { heading: 'Humidity (%)', hasCategory: false },
-            co: { heading: 'MQ-7 signal (raw ADC)', hasCategory: false }
+            pm25: { label: 'PM2.5', heading: 'PM2.5 (µg/m³)', unit: 'µg/m³', hasCategory: true },
+            temp: { label: 'Temperature', heading: 'Temperature (°C)', unit: '°C', hasCategory: false },
+            hum: { label: 'Humidity', heading: 'Humidity (%)', unit: '%', hasCategory: false },
+            co: { label: 'MQ-7 signal (raw ADC)', heading: 'MQ-7 signal (raw ADC)', unit: 'raw ADC', hasCategory: false }
         };
+        const chartCanvas = document.getElementById('reportChart');
+        let reportChart = null;
+        function selectReportMetric(metric, activeTab) {
+            const config = reportMetricConfig[metric];
+            const series = reportTrendSeries[metric];
+            if (!config || !series) return;
+
+            const hasData = series.labels.length > 0;
+            document.getElementById('reportChartTitle').textContent = `${reportPeriodLabel} ${config.label} Trend`;
+            document.getElementById('reportChartScroll').hidden = !hasData;
+            document.getElementById('reportChartEmpty').hidden = hasData;
+            document.getElementById('readingMetricHeader').textContent = config.heading;
+            document.getElementById('pm25CategoryHeader').hidden = !config.hasCategory;
+            document.querySelectorAll('.report-reading-row').forEach(function (row) {
+                row.querySelector('.reading-metric-value').textContent = row.dataset[metric];
+                row.querySelector('.pm25-category').hidden = !config.hasCategory;
+            });
+            document.querySelectorAll('.report-metric-tab').forEach(function (tab) {
+                const isSelected = tab === activeTab;
+                tab.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+            });
+            if (!hasData) return;
+
+            if (!reportChart) {
+                reportChart = new Chart(chartCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: series.labels,
+                        datasets: [{
+                            label: config.label,
+                            data: series.values,
+                            borderColor: '#174ea6',
+                            backgroundColor: 'rgba(23,78,166,.12)',
+                            fill: false,
+                            tension: .35
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: { y: { title: { display: true, text: config.unit } } }
+                    }
+                });
+            } else {
+                reportChart.data.labels = series.labels;
+                reportChart.data.datasets[0].label = config.label;
+                reportChart.data.datasets[0].data = series.values;
+                reportChart.options.scales.y.title.text = config.unit;
+                reportChart.update();
+                reportChart.resize();
+            }
+        }
         document.querySelectorAll('.report-metric-tab').forEach(function (button) {
             button.addEventListener('click', function () {
-                const metric = button.dataset.reportMetric;
-                const config = reportMetricConfig[metric];
-                if (!config) return;
-
-                document.getElementById('readingMetricHeader').textContent = config.heading;
-                document.getElementById('pm25CategoryHeader').hidden = !config.hasCategory;
-                document.querySelectorAll('.report-reading-row').forEach(function (row) {
-                    row.querySelector('.reading-metric-value').textContent = row.dataset[metric];
-                    row.querySelector('.pm25-category').hidden = !config.hasCategory;
-                });
-                document.querySelectorAll('.report-metric-tab').forEach(function (tab) {
-                    tab.setAttribute('aria-pressed', tab === button ? 'true' : 'false');
-                });
+                selectReportMetric(button.dataset.reportMetric, button);
             });
         });
-        const chartCanvas = document.getElementById('reportChart');
-        if (chartCanvas) new Chart(chartCanvas, {
-            type: 'line',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'PM2.5',
-                    data: chartValues,
-                    borderColor: '#174ea6',
-                    backgroundColor: 'rgba(23,78,166,.12)',
-                    fill: false,
-                    tension: .35
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                scales: { y: { title: { display: true, text: 'µg/m³' } } }
-            }
-        });
+        const initialMetricTab = document.querySelector('.report-metric-tab[aria-pressed="true"]');
+        if (initialMetricTab && chartCanvas) {
+            selectReportMetric(initialMetricTab.dataset.reportMetric, initialMetricTab);
+        }
 
     </script>
 </body>
