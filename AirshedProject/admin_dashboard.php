@@ -602,6 +602,7 @@ try {
                     <h4 style="margin:0; opacity: 0.9; letter-spacing: 1px;">CURRENT STATUS</h4>
                     <div id="statusText" class="status-badge" style="color: var(--primary);">FETCHING</div>
                     <p id="advice" style="font-size: 13px; line-height: 1.5;">Establishing IoT node connection...</p>
+                    <p id="lastSensorUpdate" class="forecast-meta">Waiting for sensor timestamp...</p>
                 </div>
                 <div class="card" style="text-align: left; border-top: none; border-right: 5px solid var(--accent);">
                     <h4 style="margin: 0 0 10px 0; font-weight: 800;">Hardware Health</h4>
@@ -627,18 +628,18 @@ try {
                         <span id="forecastVal" style="font-size: 40px; font-weight: 900; color: var(--ai-purple);">---</span>
                         <span class="unit">µg/m³</span>
                     </div>
-                    <div class="forecast-meta" id="selectedForecastMeta" hidden></div>
+                    <div class="forecast-meta" id="selectedForecastMeta"></div>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px;">
                     <div style="background:#f6f4ff; padding:14px; border-radius:12px; border:1px solid #e8e0ff; text-align:center;">
                         <div style="font-size:11px; font-weight:800; color:var(--ai-purple); text-transform:uppercase;">Humidity Forecast</div>
                         <div id="humidityForecast" style="font-size:24px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                        <div class="forecast-meta" id="humidityForecastMeta" hidden></div>
+                        <div class="forecast-meta" id="humidityForecastMeta"></div>
                     </div>
                     <div style="background:#ecfdf3; padding:14px; border-radius:12px; border:1px solid #dcfce7; text-align:center;">
                         <div style="font-size:11px; font-weight:800; color:#2e7d32; text-transform:uppercase;">Weather Outlook</div>
                         <div id="weatherForecast" style="font-size:18px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                        <div class="forecast-meta" id="weatherForecastMeta" hidden></div>
+                        <div class="forecast-meta" id="weatherForecastMeta"></div>
                     </div>
                 </div>
                 <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0; display: flex; align-items: center; margin-top: 14px;">
@@ -657,15 +658,15 @@ try {
                         <div class="card"><label>Temperature</label><span class="val" id="temp">--</span><span class="unit">°C</span></div>
                         <div class="card"><label>Humidity</label><span class="val" id="hum">--</span><span class="unit">%</span></div>
                         <div class="card" style="border-top-color: #00bcd4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg/m³</span></div>
-                        <div class="card" style="border-top-color: #009688;"><label>MQ Gas Reading</label><span class="val" id="co">--</span><span class="unit">raw ADC</span></div>
+                        <div class="card" style="border-top-color: #009688;"><label>MQ Sensor Reading</label><span class="val" id="co">--</span><span class="unit">Raw ADC · not calibrated CO ppm</span></div>
                     </div>
 
                     <div class="guide-card">
                         <h3>How to Read Your Airshed Dashboard</h3>
                         <p>These guidelines clarify what each measurement means and what action to take.</p>
                         <ul class="guide-list">
-                            <li><strong>PM2.5</strong>: The shared scale is 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. Missing or out-of-range values are not classified.</li>
-                            <li><strong>MQ gas reading</strong>: Raw MQ analog value from the ESP32, not calibrated CO ppm. Below 800 = Normal; 800-1799 = Warning; 1800+ = Danger. Calibrate before treating the value as a concentration.</li>
+                            <li><strong>PM2.5</strong>: The Airshed dashboard display bands are 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. These are not a claim of official AQI certification; confirm applicable thresholds with local health or environmental authorities.</li>
+                            <li><strong>MQ sensor</strong>: Raw analog value, not calibrated CO ppm. Do not use it as a CO safety measurement; use a properly calibrated gas monitor for safety decisions.</li>
                             <li><strong>Temperature</strong>: Current outdoor temperature. At 33°C or higher, advise hydration and reduced heat exposure.</li>
                             <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, conditions are highly humid.</li>
                             <li><strong>System status</strong>: Online means recent device data is available; Offline means no live reading is available.</li>
@@ -968,6 +969,7 @@ try {
     let serverForecastHum = null;
     let forecastMetrics = {};
     let forecastBasis = {};
+    let latestSensorTimestamp = null;
     let liveDataAvailable = false;
     let offlineReadingShown = false;
     let predictionLocked = false;
@@ -1136,14 +1138,15 @@ try {
         predictionLastUpdatedAt = now;
 
         document.getElementById('forecastVal').innerText = forecast !== null ? Math.max(0, forecast).toFixed(1) : '--';
-        document.getElementById('selectedForecastMeta').innerText = AirshedAirQuality.forecastSummary(
-            selectedPredictionMinutes === 30 ? forecastMetrics.forecast30 : forecastMetrics.forecast2h,
-            selectedPredictionMinutes === 30 ? forecastBasis.pm25_30m : forecastBasis.pm25_2h
+        document.getElementById('selectedForecastMeta').innerText = AirshedAirQuality.forecastDetails(
+            latestSensorTimestamp,
+            selectedPredictionMinutes,
+            selectedPredictionMinutes === 30 ? forecastMetrics.forecast30 : forecastMetrics.forecast2h
         );
         document.getElementById('humidityForecast').innerText = forecastHum !== null ? `${forecastHum.toFixed(1)}%` : '--';
-        document.getElementById('humidityForecastMeta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast_hum, forecastBasis.hum);
+        document.getElementById('humidityForecastMeta').innerText = AirshedAirQuality.forecastDetails(latestSensorTimestamp, 30, forecastMetrics.forecast_hum);
         document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTemp !== null ? `${forecastTemp.toFixed(1)}°C` : '...'}`;
-        document.getElementById('weatherForecastMeta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast_temp, forecastBasis.temp);
+        document.getElementById('weatherForecastMeta').innerText = AirshedAirQuality.forecastDetails(latestSensorTimestamp, 30, forecastMetrics.forecast_temp);
 
         if (forecast !== null && pmHistory.length) {
             const currentPM = pmHistory[pmHistory.length - 1];
@@ -1214,6 +1217,13 @@ try {
             serverForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
             forecastMetrics = d.forecast_metrics || {};
             forecastBasis = d.forecast_basis || {};
+            latestSensorTimestamp = d.latest_timestamp || null;
+            const lastUpdate = document.getElementById('lastSensorUpdate');
+            const lastReadingText = latestSensorTimestamp ? formatAirshedDateTime(latestSensorTimestamp) : 'time unavailable';
+            const readingAge = Number(d.latest_age_seconds);
+            const hasReadingAge = d.latest_age_seconds !== null && d.latest_age_seconds !== undefined && Number.isFinite(readingAge);
+            const ageText = hasReadingAge ? ` · ${Math.max(0, readingAge)}s ago` : '';
+            lastUpdate.innerText = `${d.live === true ? 'Device online' : 'Device offline'} · Last sensor reading ${lastReadingText}${ageText}`;
             if (d.live === false) {
                 liveDataAvailable = false;
                 predictionHistory = d.prediction_history || [];
@@ -1363,6 +1373,7 @@ try {
             document.getElementById('statusText').innerText = "DATA UNAVAILABLE";
             document.getElementById('sideStatus').innerText = "Offline";
             document.getElementById('sideStatus').style.color = "var(--danger)";
+            document.getElementById('lastSensorUpdate').innerText = 'Sensor data unavailable · reconnecting';
             ['temp', 'hum', 'pm25', 'co', 'bat'].forEach(id => {
                 document.getElementById(id).innerText = '--';
             });

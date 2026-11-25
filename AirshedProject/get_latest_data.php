@@ -52,6 +52,15 @@ try {
     $latest = $records ? $records[count($records) - 1] : null;
     $latestAge = $latest ? time() - $latest['timestamp_unix'] : null;
     $live = $latestAge !== null && $latestAge >= -30 && $latestAge <= 90; // Device uploads every 60 seconds.
+    $historyRecords = $records;
+    $historyWindow = $_GET['history_window'] ?? null;
+    if ($historyWindow === '1h' || $historyWindow === '24h') {
+        $windowSeconds = $historyWindow === '1h' ? 60 * 60 : 24 * 60 * 60;
+        $historyCutoff = time() - $windowSeconds;
+        $historyRecords = array_values(array_filter($records, function ($record) use ($historyCutoff) {
+            return $record['timestamp_unix'] >= $historyCutoff;
+        }));
+    }
     $history = array_map(function ($record) {
         return [
             'timestamp' => $record['timestamp'],
@@ -60,7 +69,7 @@ try {
             'pm25' => $record['pm25'],
             'co' => $record['co']
         ];
-    }, array_slice($records, -15));
+    }, $historyWindow === '24h' ? $historyRecords : array_slice($historyRecords, -1500));
 
     $forecastFields = [
         'pm25' => ['minimum' => 0, 'maximum' => 1000],
@@ -115,6 +124,8 @@ try {
         'battery' => $live ? $latest['battery'] : null,
         'status' => $live ? $pmClassification['label'] : 'OFFLINE',
         'pm25_status' => $live ? $pmClassification['level'] : 'UNKNOWN',
+        'latest_timestamp' => $latest['timestamp'] ?? null,
+        'latest_age_seconds' => $latestAge,
         'latitude' => $latest['latitude'] ?? null,
         'longitude' => $latest['longitude'] ?? null,
         'prediction_history' => $history,

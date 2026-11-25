@@ -54,6 +54,8 @@ include "config.php";
             border-radius: 16px; background: rgba(255,255,255,0.48);
             text-shadow: 0 4px 14px rgba(36,92,137,0.12); letter-spacing: 0;
         }
+        .sensor-freshness { margin: 4px auto 0; color: #174f8f; font-size: 13px; font-weight: 700; }
+        .sensor-freshness.is-stale { color: #9c3d36; }
 
         .hero > p { font-size: 18px !important; letter-spacing: 0.02em; }
 
@@ -145,6 +147,21 @@ include "config.php";
         .guide-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
         .guide-list li { background: #eef8ff; color: #38566e; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
         .guide-list strong { color: var(--primary); }
+        .category-legend { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+        .category-legend span { padding: 9px 7px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: 800; }
+        .category-good { background: #e7f5ef; color: #168a68; }
+        .category-moderate { background: #fff4dc; color: #9a6200; }
+        .category-unhealthy { background: #fff0e2; color: #b35300; }
+        .category-hazardous { background: #fdebed; color: #a52e3b; }
+        .category-source { margin-top: 10px !important; font-size: 12px !important; }
+        .pm-category { display: block; margin: 9px 0 0; font-size: 15px; font-weight: 900; }
+        .pm-advice { display: block; margin-top: 5px; color: #536b7d; font-size: 12px; line-height: 1.4; }
+        .chart-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .chart-heading h3 { margin: 0; }
+        .chart-ranges { display: flex; gap: 6px; flex-shrink: 0; }
+        .chart-range { border: 1px solid #cbdceb; border-radius: 8px; background: #fff; color: var(--primary); cursor: pointer; font: inherit; font-size: 12px; font-weight: 800; padding: 7px 10px; }
+        .chart-range[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .chart-description { margin: 0 0 12px; color: #607789; font-size: 12px; }
         .table-scroll { max-width: 100%; max-height: min(55vh, 500px); overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .sensor-log-box { align-self: start; padding: 26px; min-width: 0; height: max-content; }
         .sensor-log-box .table-scroll { max-height: 360px; min-height: 0; overflow-x: auto; overflow-y: auto; }
@@ -373,7 +390,91 @@ include "config.php";
             }
 
             .sensor-log-box table {
-                min-width: 620px;
+                min-width: 0;
+            }
+
+            .chart-heading {
+                align-items: flex-start;
+                flex-direction: column;
+                margin-bottom: 12px;
+            }
+
+            .chart-heading h3 {
+                font-size: 17px !important;
+                margin-bottom: 0 !important;
+            }
+
+            .chart-range {
+                min-height: 38px;
+                padding: 8px 14px;
+            }
+
+            .category-legend {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .sensor-log-box .table-scroll {
+                overflow-x: visible;
+            }
+
+            .sensor-log-box table,
+            .sensor-log-box tbody,
+            .sensor-log-box tr,
+            .sensor-log-box td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .sensor-log-box thead {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+
+            .sensor-log-box tbody tr {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0 10px;
+                padding: 8px 10px;
+                margin-bottom: 10px;
+                border: 1px solid #dceaf4;
+                border-radius: 12px;
+                background: #fbfdff;
+            }
+
+            .sensor-log-box td {
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 8px;
+                min-width: 0;
+                padding: 6px 0;
+                text-align: right;
+                font-size: 11px;
+                overflow-wrap: anywhere;
+            }
+
+            .sensor-log-box td::before {
+                content: attr(data-label);
+                color: #527087;
+                font-size: 10px;
+                font-weight: 800;
+                text-align: left;
+            }
+
+            .sensor-log-box td:first-child {
+                grid-column: 1 / -1;
+                justify-content: center;
+                border-bottom: 1px solid #e5f2fa;
+                margin-bottom: 3px;
+                text-align: center;
             }
 
             table {
@@ -442,6 +543,7 @@ include "config.php";
     <p style="font-size: 24px; font-weight: 700; opacity: 0.9; margin: 0;">CALAPAN CITY AIR QUALITY INDEX</p>
     <div id="statusText" class="status-display">CHECKING DATA...</div>
     <div id="clock" style="font-size: 22px; font-weight: 500; opacity: 0.8;"></div>
+    <div id="sensorFreshness" class="sensor-freshness" role="status" aria-live="polite">Checking sensor connection...</div>
     <div class="hero-float left" aria-hidden="true"><strong>Air Monitor</strong><span>Live Sensor</span></div>
     <div class="hero-float right" aria-hidden="true"><strong>City Status</strong><span>Calapan Air</span></div>
 </div>
@@ -453,19 +555,19 @@ include "config.php";
                 <span class="ai-icon" aria-hidden="true">AI</span>
                 <h3>AI ANALYTICS</h3>
             </div>
-            <p class="forecast-disclaimer">Forecast values are estimates based on recent device readings and may change as new data arrives.</p>
+            <p class="forecast-disclaimer">Estimates are based on the latest sensor reading. Historical MAE describes past test error, not a guarantee of future accuracy.</p>
             <div class="prediction-grid">
                 <div class="pred-box">
                     <span class="pred-label">Next 30 Minutes</span>
                     <span id="forecast30" class="pred-number">---</span>
                     <span class="unit">µg/m³</span>
-                    <span id="forecast30Meta" class="forecast-disclaimer" hidden></span>
+                    <span id="forecast30Meta" class="forecast-disclaimer"></span>
                 </div>
                 <div class="pred-box emphasis">
                     <span class="pred-label">Next 2 Hours</span>
                     <span id="forecastVal" class="pred-number">---</span>
                     <span class="unit">µg/m³</span>
-                    <span id="forecast2hMeta" class="forecast-disclaimer" hidden></span>
+                    <span id="forecast2hMeta" class="forecast-disclaimer"></span>
                 </div>
             </div>
         </div>
@@ -475,12 +577,12 @@ include "config.php";
                 <div style="background:#fff; border: 1px solid #dbe5f4; border-radius:16px; padding:14px; text-align:center;">
                     <div style="font-size:12px; font-weight:800; color:var(--primary); text-transform:uppercase;">Humidity Forecast</div>
                     <div id="humForecast" style="font-size:28px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                    <div id="humidityForecastMeta" class="forecast-disclaimer" hidden></div>
+                    <div id="humidityForecastMeta" class="forecast-disclaimer"></div>
                 </div>
                 <div style="background:#fff; border: 1px solid #dbe5f4; border-radius:16px; padding:14px; text-align:center;">
                     <div style="font-size:12px; font-weight:800; color:var(--primary); text-transform:uppercase;">Weather Outlook</div>
                     <div id="weatherForecast" style="font-size:20px; font-weight:900; color:var(--primary); margin-top:6px;">--</div>
-                    <div id="weatherForecastMeta" class="forecast-disclaimer" hidden></div>
+                    <div id="weatherForecastMeta" class="forecast-disclaimer"></div>
                 </div>
             </div>
             <h4 style="margin: 0 0 10px 0; color: var(--primary); font-size: 20px; font-weight: 800;">STATUS RECOMMENDATION</h4>
@@ -493,25 +595,39 @@ include "config.php";
     <div class="metrics-grid">
         <div class="card"><label>Temperature</label><span class="val" id="temp">--</span><span class="unit">Celsius (°C)</span></div>
         <div class="card"><label>Humidity</label><span class="val" id="hum">--</span><span class="unit">Percentage (%)</span></div>
-        <div class="card" style="border-top-color: #2b8fc4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg/m³</span></div>
-        <div class="card" style="border-top-color: #0f9f86;"><label>MQ Gas Reading</label><span class="val" id="co">--</span><span class="unit">raw ADC</span></div>
+        <div class="card" style="border-top-color: #2b8fc4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg/m³</span><span id="pm25Category" class="pm-category">Waiting for reading</span><span id="pm25Advice" class="pm-advice">A category will appear when a valid reading arrives.</span></div>
+        <div class="card" style="border-top-color: #0f9f86;"><label>MQ Sensor Reading</label><span class="val" id="co">--</span><span class="unit">Raw ADC · not calibrated CO ppm</span></div>
     </div>
 
     <div class="guide-card">
         <h3>How to Read Your Airshed Dashboard</h3>
         <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
         <ul class="guide-list">
-            <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. The shared scale is 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. Missing or out-of-range values are not classified.</li>
-            <li><strong>MQ gas reading</strong>: The ESP32 sends the MQ sensor's raw analog value, not a calibrated CO ppm measurement. Below 800 = Normal; 800-1799 = Warning, so improve ventilation and check possible sources; 1800+ = Danger, so leave the area and seek help. Use this as an alert guide only until the sensor is calibrated.</li>
+            <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. Missing or out-of-range readings are not classified.</li>
+            <li><strong>MQ sensor</strong>: This is a raw analog reading, not a CO concentration. It is not calibrated for CO, so do not use it as a CO safety measurement. Use a properly calibrated gas monitor for safety decisions.</li>
             <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
             <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
             <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the portal has no live reading to display.</li>
         </ul>
+        <div class="category-legend" aria-label="Airshed PM2.5 display bands">
+            <span class="category-good">Good<br>0–12 µg/m³</span>
+            <span class="category-moderate">Moderate<br>&gt;12–35 µg/m³</span>
+            <span class="category-unhealthy">Unhealthy<br>&gt;35–150 µg/m³</span>
+            <span class="category-hazardous">Hazardous<br>&gt;150–1000 µg/m³</span>
+        </div>
+        <p class="category-source">These are the Airshed dashboard's configured display bands, not a claim of official AQI certification. Confirm applicable thresholds with the local health or environmental authority.</p>
     </div>
 
     <div class="content-split">
         <div class="section-box sensor-log-box">
-            <h3 style="font-size: 22px; font-weight: 800; margin-bottom: 25px; color: var(--primary);">LIVE TREND: PM2.5 & TEMPERATURE</h3>
+            <div class="chart-heading">
+                <h3 style="font-size: 22px; font-weight: 800; color: var(--primary);">SENSOR TREND</h3>
+                <div class="chart-ranges" role="group" aria-label="Chart time range">
+                    <button class="chart-range" type="button" data-window="1h" aria-pressed="true">1 hour</button>
+                    <button class="chart-range" type="button" data-window="24h" aria-pressed="false">24 hours</button>
+                </div>
+            </div>
+            <p id="chartDescription" class="chart-description">Each point is a unique sensor reading, labeled with its recorded time.</p>
             <canvas id="dualChart" height="220"></canvas>
         </div>
 
@@ -535,10 +651,7 @@ include "config.php";
 </div>
 
 <script>
-let tempHistory = [];
-let humHistory = [];
 let lastAlertRequest = 0;
-let historyInitialized = false;
 
 function formatAirshedDateTime(value) {
     const date = value instanceof Date ? value : new Date(value);
@@ -551,17 +664,6 @@ function formatAirshedDateTime(value) {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: false
-    });
-}
-
-function formatAirshedTime(value) {
-    const date = value instanceof Date ? value : new Date(value);
-    if (!Number.isFinite(date.getTime())) return '--';
-    return date.toLocaleTimeString('en-GB', {
-        timeZone: 'Asia/Manila',
-        hour: '2-digit',
-        minute: '2-digit',
         hour12: false
     });
 }
@@ -609,8 +711,116 @@ function renderHistoryRows(history) {
         const humidityText = Number.isFinite(humidity) ? `${humidity.toFixed(1)}%` : '--';
         const coText = Number.isFinite(co) ? co.toFixed(1) : '--';
         const pmColor = classification.color;
-        historyBody.insertAdjacentHTML('beforeend', `<tr><td><b>${readingTime}</b></td><td style="color:#b87512">${temp.toFixed(1)}°C</td><td>${humidityText}</td><td style="color:${pmColor}; font-weight:900;">${pm25 !== null && Number.isFinite(pm25) ? pm25.toFixed(1) : '--'}</td><td>${coText}</td><td style="color:${statusColor}; font-weight:900;">${status}</td></tr>`);
+        historyBody.insertAdjacentHTML('beforeend', `<tr><td data-label="Date & time"><b>${readingTime}</b></td><td data-label="Temperature" style="color:#b87512">${temp.toFixed(1)}°C</td><td data-label="Humidity">${humidityText}</td><td data-label="PM2.5" style="color:${pmColor}; font-weight:900;">${pm25 !== null && Number.isFinite(pm25) ? pm25.toFixed(1) : '--'}</td><td data-label="MQ raw ADC">${coText}</td><td data-label="PM2.5 status" style="color:${statusColor}; font-weight:900;">${status}</td></tr>`);
     });
+}
+
+const chartHistory = new Map();
+let chartRows = [];
+let selectedChartWindow = '1h';
+
+function mergeChartReadings(readings) {
+    if (!Array.isArray(readings)) return;
+    readings.forEach(reading => {
+        const timestampMs = Date.parse(reading.timestamp || '');
+        if (!Number.isFinite(timestampMs)) return;
+        chartHistory.set(timestampMs, { ...reading, timestampMs });
+    });
+
+    const oldestKeptTime = Date.now() - 24 * 60 * 60 * 1000;
+    chartHistory.forEach((reading, timestampMs) => {
+        if (timestampMs < oldestKeptTime) chartHistory.delete(timestampMs);
+    });
+}
+
+function formatChartLabel(timestampMs) {
+    const options = selectedChartWindow === '24h'
+        ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+        : { hour: '2-digit', minute: '2-digit', hour12: false };
+    return new Date(timestampMs).toLocaleString('en-GB', { ...options, timeZone: 'Asia/Manila' });
+}
+
+function renderSensorChart() {
+    const windowMs = selectedChartWindow === '24h' ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+    const cutoff = Date.now() - windowMs;
+    chartRows = Array.from(chartHistory.values())
+        .filter(reading => reading.timestampMs >= cutoff)
+        .sort((left, right) => left.timestampMs - right.timestampMs);
+
+    chart.data.labels = chartRows.map(reading => formatChartLabel(reading.timestampMs));
+    chart.data.datasets[0].data = chartRows.map(reading => reading.pm25);
+    chart.data.datasets[1].data = chartRows.map(reading => reading.temp);
+    chart.data.datasets[2].data = chartRows.map(reading => reading.hum);
+    chart.data.datasets[3].data = chartRows.map(reading => reading.co);
+
+    const pmValues = chartRows.map(reading => Number(reading.pm25)).filter(Number.isFinite);
+    const pmMaximum = pmValues.length ? Math.max(...pmValues) : 0;
+    chart.options.scales.y.suggestedMax = pmMaximum > 40 ? Math.ceil(pmMaximum / 50) * 50 : 40;
+    chart.update('none');
+
+    const rangeText = selectedChartWindow === '24h' ? '24 hours' : '1 hour';
+    document.getElementById('chartDescription').innerText = chartRows.length
+        ? `Showing ${chartRows.length} unique sensor readings from the last ${rangeText}. Times are the device reading timestamps.`
+        : `No sensor readings are available for the last ${rangeText}.`;
+}
+
+function loadChartWindow(windowName) {
+    if (windowName !== '1h' && windowName !== '24h') return;
+    selectedChartWindow = windowName;
+    document.querySelectorAll('.chart-range').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.window === windowName));
+    });
+
+    fetch(`get_latest_data.php?history_window=${encodeURIComponent(windowName)}`, { cache: 'no-store' })
+        .then(response => {
+            if (!response.ok) throw new Error(`Sensor history request failed (${response.status})`);
+            return response.json();
+        })
+        .then(data => {
+            mergeChartReadings(data.prediction_history);
+            if (selectedChartWindow === windowName) renderSensorChart();
+        })
+        .catch(error => {
+            console.error(error);
+            document.getElementById('chartDescription').innerText = 'Could not load sensor history. Try selecting the range again.';
+        });
+}
+
+function updateSensorFreshness(isLive, timestamp) {
+    const freshness = document.getElementById('sensorFreshness');
+    const date = timestamp ? new Date(timestamp) : null;
+    const hasValidTime = date && Number.isFinite(date.getTime());
+    freshness.classList.toggle('is-stale', !isLive);
+    if (!hasValidTime) {
+        freshness.innerText = isLive ? 'Sensor online · reading time unavailable' : 'Sensor offline · no recent reading';
+        return;
+    }
+
+    const ageSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+    const ageText = ageSeconds < 60 ? `${ageSeconds}s ago` : `${Math.floor(ageSeconds / 60)}m ago`;
+    freshness.innerText = `${isLive ? 'Sensor online' : 'Sensor offline'} · Last reading ${formatAirshedDateTime(date)} · ${ageText}`;
+}
+
+function updatePm25Category(value) {
+    const category = AirshedAirQuality.classifyPm25(value);
+    const categoryElement = document.getElementById('pm25Category');
+    const adviceElement = document.getElementById('pm25Advice');
+    categoryElement.innerText = category.label === 'Unknown' || category.label === 'Invalid'
+        ? 'Category unavailable'
+        : `${category.label} · Airshed display band`;
+    categoryElement.style.color = category.color;
+
+    const advice = {
+        GOOD: 'Within the dashboard’s Good display band.',
+        MODERATE: 'Sensitive individuals may wish to limit prolonged outdoor activity.',
+        UNHEALTHY: 'Consider reducing prolonged outdoor exposure.',
+        HAZARDOUS: 'Follow local public-health guidance and reduce outdoor exposure.'
+    };
+    adviceElement.innerText = advice[category.level] || 'A category will appear when a valid reading arrives.';
+}
+
+function updateForecastContext(timestamp, horizonMinutes, metrics, elementId) {
+    document.getElementById(elementId).innerText = AirshedAirQuality.forecastDetails(timestamp, horizonMinutes, metrics);
 }
 
 // Dual-Axis Chart
@@ -652,6 +862,16 @@ const chart = new Chart(ctx, {
         scales: { 
             y: { type: 'linear', position: 'left' },
             y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    title: items => {
+                        const reading = items.length ? chartRows[items[0].dataIndex] : null;
+                        return reading ? formatAirshedDateTime(reading.timestampMs) : '';
+                    }
+                }
+            }
         }
     }
 });
@@ -670,47 +890,31 @@ function fetchData() {
             document.getElementById('co').innerText = '--';
             document.getElementById('statusText').innerText = 'NO LIVE DATA';
             document.getElementById('statusText').style.color = '#a9404a';
-                const recentHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
+            const recentHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
             renderHistoryRows(recentHistory);
-                chart.data.labels = recentHistory.map((reading, index) => reading.timestamp
-                    ? formatAirshedTime(reading.timestamp)
-                    : `Reading ${index + 1}`);
-                chart.data.datasets[0].data = recentHistory.map(reading => reading.pm25 === null || reading.pm25 === undefined ? null : Number(reading.pm25));
-                chart.data.datasets[1].data = recentHistory.map(reading => reading.temp === null || reading.temp === undefined ? null : Number(reading.temp));
-                chart.data.datasets[2].data = recentHistory.map(reading => reading.hum === null || reading.hum === undefined ? null : Number(reading.hum));
-                chart.data.datasets[3].data = recentHistory.map(reading => reading.co === null || reading.co === undefined ? null : Number(reading.co));
-                chart.update('none');
-                document.getElementById('forecast30').innerText = '---';
-                document.getElementById('forecastVal').innerText = '---';
-                document.getElementById('forecast30Meta').innerText = 'Forecast paused while the sensor is offline.';
-                document.getElementById('forecast2hMeta').innerText = 'Forecast paused while the sensor is offline.';
-                document.getElementById('humForecast').innerText = '--';
-                document.getElementById('humidityForecastMeta').innerText = 'Forecast paused while the sensor is offline.';
-                document.getElementById('weatherForecast').innerText = 'No live sensor data';
-                document.getElementById('weatherForecastMeta').innerText = 'Forecast paused while the sensor is offline.';
-                document.getElementById('aiInsight').innerText = 'Forecasts are paused while the sensor is offline.';
+            mergeChartReadings(recentHistory);
+            renderSensorChart();
+            updateSensorFreshness(false, d.latest_timestamp);
+            updatePm25Category(null);
+            document.getElementById('forecast30').innerText = '---';
+            document.getElementById('forecastVal').innerText = '---';
+            updateForecastContext(null, 30, null, 'forecast30Meta');
+            updateForecastContext(null, 120, null, 'forecast2hMeta');
+            document.getElementById('humForecast').innerText = '--';
+            updateForecastContext(null, 30, null, 'humidityForecastMeta');
+            document.getElementById('weatherForecast').innerText = 'No live sensor data';
+            updateForecastContext(null, 30, null, 'weatherForecastMeta');
+            document.getElementById('aiInsight').innerText = 'Forecasts are paused while the sensor is offline.';
             return;
         }
 
         const recentHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
         renderHistoryRows(recentHistory);
+        mergeChartReadings(recentHistory);
+        renderSensorChart();
+        updateSensorFreshness(true, d.latest_timestamp);
         const currentTemp = parseFloat(d.temp);
         const currentHum = parseFloat(d.hum);
-        if (!historyInitialized && Array.isArray(d.prediction_history)) {
-            d.prediction_history.forEach(reading => {
-                const historyTemp = reading.temp === null || reading.temp === undefined ? NaN : Number(reading.temp);
-                const historyHum = reading.hum === null || reading.hum === undefined ? NaN : Number(reading.hum);
-                const historyPm25 = reading.pm25 === null || reading.pm25 === undefined ? NaN : Number(reading.pm25);
-                if (Number.isFinite(historyTemp) && historyTemp >= -40 && historyTemp <= 85) tempHistory.push(historyTemp);
-                if (Number.isFinite(historyHum) && historyHum >= 0 && historyHum <= 100) humHistory.push(historyHum);
-                if (Number.isFinite(historyPm25) && historyPm25 >= 0 && historyPm25 <= 1000) chart.data.datasets[0].data.push(historyPm25);
-            });
-            historyInitialized = true;
-        }
-        tempHistory.push(currentTemp);
-        humHistory.push(currentHum);
-        if (tempHistory.length > 12) tempHistory.shift();
-        if (humHistory.length > 12) humHistory.shift();
 
         const forecastTemp = d.forecast_temp !== undefined ? d.forecast_temp : null;
         const forecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
@@ -724,11 +928,13 @@ function fetchData() {
         document.getElementById('pm25').innerText = pmValue === null ? '--' : pmValue.toFixed(1);
         const classification = AirshedAirQuality.classifyPm25(d.pm25);
         document.getElementById('pm25').style.color = classification.color;
+        updatePm25Category(d.pm25);
         document.getElementById('co').innerText = d.co;
+        const forecastMetrics = d.forecast_metrics || {};
         document.getElementById('humForecast').innerText = forecastHumValue !== null ? `${forecastHumValue.toFixed(1)}%` : '--';
-        document.getElementById('humidityForecastMeta').innerText = AirshedAirQuality.forecastSummary(d.forecast_metrics && d.forecast_metrics.forecast_hum, d.forecast_basis && d.forecast_basis.hum);
+        updateForecastContext(d.latest_timestamp, 30, forecastMetrics.forecast_hum, 'humidityForecastMeta');
         document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTempValue !== null ? `${forecastTempValue.toFixed(1)}°C` : '...'}`;
-        document.getElementById('weatherForecastMeta').innerText = AirshedAirQuality.forecastSummary(d.forecast_metrics && d.forecast_metrics.forecast_temp, d.forecast_basis && d.forecast_basis.temp);
+        updateForecastContext(d.latest_timestamp, 30, forecastMetrics.forecast_temp, 'weatherForecastMeta');
 
         let status = classification.label;
         let tColor = classification.color;
@@ -738,10 +944,10 @@ function fetchData() {
 
         const p30 = d.forecast30 !== undefined ? d.forecast30 : null;
         const p2h = d.forecast2h !== undefined ? d.forecast2h : null;
-        document.getElementById('forecast30').innerText = p30 !== null ? Number(p30).toFixed(1) : '---';
-        document.getElementById('forecastVal').innerText = p2h !== null ? Number(p2h).toFixed(1) : '---';
-        document.getElementById('forecast30Meta').innerText = AirshedAirQuality.forecastSummary(d.forecast_metrics && d.forecast_metrics.forecast30, d.forecast_basis && d.forecast_basis.pm25_30m);
-        document.getElementById('forecast2hMeta').innerText = AirshedAirQuality.forecastSummary(d.forecast_metrics && d.forecast_metrics.forecast2h, d.forecast_basis && d.forecast_basis.pm25_2h);
+        document.getElementById('forecast30').innerText = p30 !== null && Number.isFinite(Number(p30)) ? Number(p30).toFixed(1) : '---';
+        document.getElementById('forecastVal').innerText = p2h !== null && Number.isFinite(Number(p2h)) ? Number(p2h).toFixed(1) : '---';
+        updateForecastContext(d.latest_timestamp, 30, forecastMetrics.forecast30, 'forecast30Meta');
+        updateForecastContext(d.latest_timestamp, 120, forecastMetrics.forecast2h, 'forecast2hMeta');
 
         if(p2h !== null && pmValue !== null) {
             let f2 = parseFloat(p2h);
@@ -758,23 +964,6 @@ function fetchData() {
             document.getElementById('aiInsight').innerText = AirshedAirQuality.forecastSummary(d.forecast_metrics && d.forecast_metrics.forecast2h, d.forecast_basis && d.forecast_basis.pm25_2h);
         }
 
-        let now = formatAirshedTime(new Date());
-        chart.data.labels.push(now);
-        chart.data.datasets[0].data.push(pmValue);
-        chart.data.datasets[1].data.push(d.temp);
-        chart.data.datasets[2].data.push(d.hum);
-        chart.data.datasets[3].data.push(d.co);
-        if(chart.data.labels.length > 15) { 
-            chart.data.labels.shift(); 
-            chart.data.datasets.forEach(dataset => dataset.data.shift());
-        }
-        const pmValues = chart.data.datasets[0].data.map(value => Number(value)).filter(Number.isFinite);
-        const pmMaximum = pmValues.length ? Math.max(...pmValues) : 0;
-        chart.options.scales.y.suggestedMax = pmMaximum > 40
-            ? Math.ceil(pmMaximum / 50) * 50
-            : 40;
-        chart.update('none');
-
     })
     .catch(err => {
         console.error(err);
@@ -787,9 +976,17 @@ function fetchData() {
         document.getElementById('forecastVal').innerText = '---';
         document.getElementById('forecast30Meta').innerText = 'No validated forecast: sensor data could not be loaded.';
         document.getElementById('forecast2hMeta').innerText = 'No validated forecast: sensor data could not be loaded.';
+        const freshness = document.getElementById('sensorFreshness');
+        freshness.classList.add('is-stale');
+        freshness.innerText = 'Sensor data unavailable · reconnecting';
+        updatePm25Category(null);
     });
 }
 
+document.querySelectorAll('.chart-range').forEach(button => {
+    button.addEventListener('click', () => loadChartWindow(button.dataset.window));
+});
+loadChartWindow(selectedChartWindow);
 setInterval(fetchData, 3000);
 setInterval(() => document.getElementById('clock').innerText = formatAirshedDateTime(new Date()), 1000);
 fetchData();

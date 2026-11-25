@@ -379,7 +379,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">TEMP</label><span class="val" id="temp">--</span><span>°C</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">HUMIDITY</label><span class="val" id="hum">--</span><span>%</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">PM2.5</label><span class="val" id="pm25" style="color:var(--ai-purple);">--</span><span>µg/m³</span></div>
-                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">MQ GAS READING</label><span class="val" id="co">--</span><span>raw ADC</span></div>
+                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">MQ SENSOR · RAW ADC</label><span class="val" id="co">--</span><span>Not calibrated CO ppm</span></div>
                 </div>
                 
                 <div class="ai-panel">
@@ -397,19 +397,19 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                             <div id="selectedForecast" class="selected-forecast-value">--</div>
                             <div style="font-size:12px; font-weight:700; color:#7f7f9a;">µg/m³</div>
                             <div id="selectedForecastLabel" class="selected-forecast-note">Next 30 minutes</div>
-                            <div id="selectedForecastMeta" class="selected-forecast-note" hidden></div>
+                            <div id="selectedForecastMeta" class="selected-forecast-note"></div>
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:20px;">
                         <div class="forecast-tile" style="background:#f6f4ff; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">Humidity Forecast</label>
                             <div id="humForecast" style="font-size:24px; font-weight:900;">--</div>
-                            <div id="humidityForecastMeta" class="selected-forecast-note" hidden></div>
+                            <div id="humidityForecastMeta" class="selected-forecast-note"></div>
                         </div>
                         <div class="forecast-tile" style="background:#ecfdf3; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; color:#2e7d32;">Weather Outlook</label>
                             <div id="weatherForecast" style="font-size:18px; font-weight:900;">--</div>
-                            <div id="weatherForecastMeta" class="selected-forecast-note" hidden></div>
+                            <div id="weatherForecastMeta" class="selected-forecast-note"></div>
                         </div>
                     </div>
                     <div style="display:flex; gap:10px; margin-top:12px;">
@@ -417,13 +417,13 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                             <label style="font-size:10px; font-weight:800; color:var(--ai-purple);">PM2.5 · NEXT 30 MIN</label>
                             <div id="predict30" style="font-size:24px; font-weight:900;">--</div>
                             <div style="font-size:11px; font-weight:700; color:#7f7f9a;">µg/m³</div>
-                            <div id="predict30Meta" class="selected-forecast-note" hidden></div>
+                            <div id="predict30Meta" class="selected-forecast-note"></div>
                         </div>
                         <div class="forecast-tile" style="flex:1; background:var(--ai-purple); color:#fff; padding:15px; border-radius:15px; text-align:center;">
                             <label style="font-size:10px; font-weight:800; opacity:0.8;">PM2.5 · NEXT 2 HOURS</label>
                             <div id="predict2h" style="font-size:24px; font-weight:900;">--</div>
                             <div style="font-size:11px; font-weight:700; opacity:0.8;">µg/m³</div>
-                            <div id="predict2hMeta" class="selected-forecast-note" style="color:rgba(255,255,255,.82);" hidden></div>
+                            <div id="predict2hMeta" class="selected-forecast-note" style="color:rgba(255,255,255,.82);"></div>
                         </div>
                     </div>
                     <p class="forecast-disclaimer">Forecast values are estimates based on recent device readings and may change as new data arrives.</p>
@@ -434,8 +434,8 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 <h3>How to Read Your Airshed Dashboard</h3>
                 <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
                 <ul class="guide-list">
-                    <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. The shared scale is 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. Missing or out-of-range values are not classified.</li>
-                    <li><strong>MQ gas reading</strong>: The ESP32 sends the MQ sensor's raw analog value, not a calibrated CO ppm measurement. Below 800 = Normal; 800-1799 = Warning, so improve ventilation and check possible sources; 1800+ = Danger, so leave the area and seek help. Use this as an alert guide only until the sensor is calibrated.</li>
+                    <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. The Airshed dashboard display bands are 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. These are not a claim of official AQI certification; confirm applicable thresholds with local health or environmental authorities.</li>
+                    <li><strong>MQ sensor</strong>: The raw analog value is not calibrated CO ppm. Do not use it as a CO safety measurement; use a properly calibrated gas monitor for safety decisions.</li>
                     <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
                     <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
                     <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the dashboard has no live reading to display.</li>
@@ -524,10 +524,10 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
     let serverForecastHum = null;
     let forecastMetrics = {};
     let forecastBasis = {};
+    let latestSensorTimestamp = null;
     let liveDataAvailable = false;
     let selectedForecastMinutes = 30;
     let predictionLocked = false;
-    let offlineReadingShown = false;
     let lastAlertRequest = 0;
     let predictionSnapshot = { pm: null, hum: null, temp: null, outlook: 'Pleasant' };
     let predictionLastUpdatedAt = 0;
@@ -601,6 +601,34 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         return "Pleasant";
     }
 
+    function renderUserHistory(history, isLive) {
+        const tableBody = document.getElementById('historyBody');
+        tableBody.innerHTML = '';
+        const readings = Array.isArray(history) ? history : [];
+        readings.slice().reverse().slice(0, 5).forEach((reading, index) => {
+            const temperature = reading.temp === null || reading.temp === undefined ? NaN : Number(reading.temp);
+            const pm25 = reading.pm25 === null || reading.pm25 === undefined ? null : Number(reading.pm25);
+            const classification = AirshedAirQuality.classifyPm25(pm25);
+            const row = document.createElement('tr');
+            const values = [
+                AirshedAirQuality.formatManilaDateTime(reading.timestamp),
+                Number.isFinite(temperature) ? `${temperature.toFixed(1)}°C` : '--',
+                pm25 !== null && Number.isFinite(pm25) ? pm25.toFixed(1) : '--',
+                classification.label,
+                index === 0 ? (isLive ? 'ONLINE' : 'OFFLINE') : 'Recorded'
+            ];
+            values.forEach((value, cellIndex) => {
+                const cell = row.insertCell();
+                cell.textContent = value;
+                if (cellIndex === 2 || cellIndex === 3) {
+                    cell.style.color = classification.color;
+                    cell.style.fontWeight = '800';
+                }
+            });
+            tableBody.appendChild(row);
+        });
+    }
+
     function updatePredictionSnapshot(force = false) {
         const now = Date.now();
         if (!force && predictionLocked && (now - predictionLastUpdatedAt < predictionWindowMs)) return;
@@ -636,14 +664,15 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
         predictionLastUpdatedAt = now;
 
         document.getElementById('selectedForecast').innerText = forecast !== null ? Math.max(0, forecast).toFixed(1) : '--';
-        document.getElementById('selectedForecastMeta').innerText = AirshedAirQuality.forecastSummary(
-            selectedForecastMinutes === 30 ? forecastMetrics.forecast30 : forecastMetrics.forecast2h,
-            selectedForecastMinutes === 30 ? forecastBasis.pm25_30m : forecastBasis.pm25_2h
+        document.getElementById('selectedForecastMeta').innerText = AirshedAirQuality.forecastDetails(
+            latestSensorTimestamp,
+            selectedForecastMinutes,
+            selectedForecastMinutes === 30 ? forecastMetrics.forecast30 : forecastMetrics.forecast2h
         );
         document.getElementById('humForecast').innerText = forecastHum !== null ? `${forecastHum.toFixed(1)}%` : '--';
-        document.getElementById('humidityForecastMeta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast_hum, forecastBasis.hum);
+        document.getElementById('humidityForecastMeta').innerText = AirshedAirQuality.forecastDetails(latestSensorTimestamp, 30, forecastMetrics.forecast_hum);
         document.getElementById('weatherForecast').innerText = `${outlook} · ${forecastTemp !== null ? `${forecastTemp.toFixed(1)}°C` : '...'}`;
-        document.getElementById('weatherForecastMeta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast_temp, forecastBasis.temp);
+        document.getElementById('weatherForecastMeta').innerText = AirshedAirQuality.forecastDetails(latestSensorTimestamp, 30, forecastMetrics.forecast_temp);
 
         if (forecast !== null && pmHistoryData.length >= 3 && Number.isFinite(pmHistoryData[pmHistoryData.length - 1])) {
             const currentPm25 = pmHistoryData[pmHistoryData.length - 1];
@@ -710,7 +739,8 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             serverForecastHum = d.forecast_hum !== undefined ? d.forecast_hum : null;
             forecastMetrics = d.forecast_metrics || {};
             forecastBasis = d.forecast_basis || {};
-            if (d.live === false) {
+            latestSensorTimestamp = d.latest_timestamp || null;
+            if (d.live !== true) {
                 liveDataAvailable = false;
                 predictionHistory = d.prediction_history || [];
                 tempHistory = predictionHistory.map(reading => reading.temp === null || reading.temp === undefined ? NaN : Number(reading.temp));
@@ -724,15 +754,14 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 document.getElementById('statusText').style.color = '#ef5350';
                 document.getElementById('syncStatus').innerText = 'Device offline · No live data';
                 document.getElementById('syncStatus').style.color = '#d32f2f';
-                if (!offlineReadingShown) {
-                    document.getElementById('historyBody').insertAdjacentHTML('afterbegin', `<tr><td><b>${new Date().toLocaleTimeString()}</b></td><td>--</td><td>--</td><td style="color:#ef5350; font-weight:800;">OFFLINE</td><td style="color:#ef5350; font-weight:800;">OFFLINE</td></tr>`);
-                    offlineReadingShown = true;
-                }
+                renderUserHistory(predictionHistory, false);
+                const lastReading = latestSensorTimestamp ? AirshedAirQuality.formatManilaDateTime(latestSensorTimestamp) : 'time unavailable';
+                document.getElementById('syncStatus').innerText = `Device offline · Last sensor reading ${lastReading}`;
+                document.getElementById('syncStatus').style.color = '#d32f2f';
                 updatePredictionSnapshot(true);
                 return;
             }
             liveDataAvailable = true;
-            offlineReadingShown = false;
             predictionHistory = [];
             const currentTemp = d.temp === null ? NaN : parseFloat(d.temp);
             const currentHum = d.hum === null ? NaN : parseFloat(d.hum);
@@ -757,7 +786,12 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             document.getElementById('statusText').innerText = status;
             document.getElementById('statusText').style.color = tColor;
             requestCriticalAlert(val);
-            document.getElementById('syncStatus').innerText = `Device online · Last sync ${new Date().toLocaleTimeString()}`;
+            const ageSeconds = Number(d.latest_age_seconds);
+            const ageText = d.latest_age_seconds !== null && d.latest_age_seconds !== undefined && Number.isFinite(ageSeconds)
+                ? `${Math.max(0, ageSeconds)}s ago`
+                : 'age unavailable';
+            const lastReading = latestSensorTimestamp ? AirshedAirQuality.formatManilaDateTime(latestSensorTimestamp) : 'time unavailable';
+            document.getElementById('syncStatus').innerText = `Device online · Last sensor reading ${lastReading} · ${ageText}`;
             document.getElementById('syncStatus').style.color = '#16845b';
             document.getElementById('userAdvisory').innerText = classification.level === 'HAZARDOUS'
                 ? 'Hazardous air detected. Avoid outdoor exposure and follow local health guidance.'
@@ -777,24 +811,30 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
             }
             document.getElementById('predict30').innerText = serverForecast30 !== null ? Number(serverForecast30).toFixed(1) : '--';
             document.getElementById('predict2h').innerText = serverForecast2h !== null ? Number(serverForecast2h).toFixed(1) : '--';
-            document.getElementById('predict30Meta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast30, forecastBasis.pm25_30m);
-            document.getElementById('predict2hMeta').innerText = AirshedAirQuality.forecastSummary(forecastMetrics.forecast2h, forecastBasis.pm25_2h);
+            document.getElementById('predict30Meta').innerText = AirshedAirQuality.forecastDetails(latestSensorTimestamp, 30, forecastMetrics.forecast30);
+            document.getElementById('predict2hMeta').innerText = AirshedAirQuality.forecastDetails(latestSensorTimestamp, 120, forecastMetrics.forecast2h);
 
-            // Update Chart
-            let t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            chart.data.labels.push(t);
-            chart.data.datasets[0].data.push(Number.isFinite(val) ? val : null);
-            chart.data.datasets[1].data.push(d.temp);
-            chart.data.datasets[2].data.push(d.hum);
-            chart.data.datasets[3].data.push(d.co);
-            if(chart.data.labels.length > 15) { chart.data.labels.shift(); chart.data.datasets.forEach(dataset => dataset.data.shift()); }
+            // Render actual device timestamps so frequent polling does not duplicate points.
+            const chartHistory = Array.isArray(d.prediction_history) ? d.prediction_history : [];
+            chart.data.labels = chartHistory.map(reading => {
+                const timestamp = new Date(reading.timestamp);
+                return Number.isFinite(timestamp.getTime())
+                    ? timestamp.toLocaleTimeString('en-GB', {
+                        timeZone: 'Asia/Manila',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    })
+                    : '--';
+            });
+            chart.data.datasets[0].data = chartHistory.map(reading => reading.pm25);
+            chart.data.datasets[1].data = chartHistory.map(reading => reading.temp);
+            chart.data.datasets[2].data = chartHistory.map(reading => reading.hum);
+            chart.data.datasets[3].data = chartHistory.map(reading => reading.co);
             chart.update();
 
-            // Update History Table
-            const pmColor = classification.color;
-            let row = `<tr><td><b>${t}</b></td><td>${d.temp === null ? '--' : `${d.temp}°C`}</td><td style="color:${pmColor}; font-weight:900;">${Number.isFinite(val) ? val.toFixed(1) : '--'}</td><td style="color:${tColor}; font-weight:800;">${status}</td><td style="color:#16845b; font-weight:800;">ONLINE</td></tr>`;
-            document.getElementById('historyBody').insertAdjacentHTML('afterbegin', row);
-            if(document.getElementById('historyBody').rows.length > 5) document.getElementById('historyBody').deleteRow(5);
+            renderUserHistory(chartHistory, true);
 
         }).catch(err => {
             console.error(err);
