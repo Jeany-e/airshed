@@ -596,7 +596,7 @@ include "config.php";
         <div class="card"><label>Temperature</label><span class="val" id="temp">--</span><span class="unit">Celsius (°C)</span></div>
         <div class="card"><label>Humidity</label><span class="val" id="hum">--</span><span class="unit">Percentage (%)</span></div>
         <div class="card" style="border-top-color: #2b8fc4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg/m³</span><span id="pm25Category" class="pm-category">Waiting for reading</span><span id="pm25Advice" class="pm-advice">A category will appear when a valid reading arrives.</span></div>
-        <div class="card" style="border-top-color: #0f9f86;"><label>MQ Sensor Reading</label><span class="val" id="co">--</span><span class="unit">Raw ADC · not calibrated CO ppm</span></div>
+        <div class="card" style="border-top-color: #0f9f86;"><label>CO Sensor Signal (MQ-7)</label><span class="val" id="co">--</span><span class="unit">Raw sensor response · ADC counts</span></div>
     </div>
 
     <div class="guide-card">
@@ -604,7 +604,7 @@ include "config.php";
         <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
         <ul class="guide-list">
             <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. Missing or out-of-range readings are not classified.</li>
-            <li><strong>MQ sensor</strong>: This is a raw analog reading, not a CO concentration. It is not calibrated for CO, so do not use it as a CO safety measurement. Use a properly calibrated gas monitor for safety decisions.</li>
+            <li><strong>CO sensor (MQ-7)</strong>: Displays the sensor response as raw ADC counts for observing changes in the signal over time.</li>
             <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
             <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
             <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the portal has no live reading to display.</li>

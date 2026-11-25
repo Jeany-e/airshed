@@ -658,7 +658,7 @@ try {
                         <div class="card"><label>Temperature</label><span class="val" id="temp">--</span><span class="unit">°C</span></div>
                         <div class="card"><label>Humidity</label><span class="val" id="hum">--</span><span class="unit">%</span></div>
                         <div class="card" style="border-top-color: #00bcd4;"><label>PM2.5 Level</label><span class="val" id="pm25">--</span><span class="unit">µg/m³</span></div>
-                        <div class="card" style="border-top-color: #009688;"><label>MQ Sensor Reading</label><span class="val" id="co">--</span><span class="unit">Raw ADC · not calibrated CO ppm</span></div>
+                        <div class="card" style="border-top-color: #009688;"><label>CO Sensor Signal (MQ-7)</label><span class="val" id="co">--</span><span class="unit">Raw sensor response · ADC counts</span></div>
                     </div>
 
                     <div class="guide-card">
@@ -666,7 +666,7 @@ try {
                         <p>These guidelines clarify what each measurement means and what action to take.</p>
                         <ul class="guide-list">
                             <li><strong>PM2.5</strong>: The Airshed dashboard display bands are 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. These are not a claim of official AQI certification; confirm applicable thresholds with local health or environmental authorities.</li>
-                            <li><strong>MQ sensor</strong>: Raw analog value, not calibrated CO ppm. Do not use it as a CO safety measurement; use a properly calibrated gas monitor for safety decisions.</li>
+                            <li><strong>CO sensor (MQ-7)</strong>: Displays the sensor response as raw ADC counts for observing changes in the signal over time.</li>
                             <li><strong>Temperature</strong>: Current outdoor temperature. At 33°C or higher, advise hydration and reduced heat exposure.</li>
                             <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, conditions are highly humid.</li>
                             <li><strong>System status</strong>: Online means recent device data is available; Offline means no live reading is available.</li>

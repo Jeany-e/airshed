@@ -491,7 +491,7 @@ $averageDelta = $dailyPm25 && $previousPm25
                 <div class="panel-head" style="padding: 0 0 18px; border-bottom: 0;">
                     <div>
                         <h2>Daily Air Quality Trend</h2>
-                        <span>Device readings by timestamp. MQ readings are raw ADC, not calibrated CO ppm.</span>
+                        <span>Device readings by timestamp. CO sensor (MQ-7) values are shown as raw ADC counts.</span>
                     </div>
                 </div>
                 <div class="chart-scroll"><div class="chart-wrap"><canvas id="dailyChart"></canvas></div></div>

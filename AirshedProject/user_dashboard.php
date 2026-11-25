@@ -381,7 +381,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">TEMP</label><span class="val" id="temp">--</span><span>°C</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">HUMIDITY</label><span class="val" id="hum">--</span><span>%</span></div>
                     <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">PM2.5</label><span class="val" id="pm25" style="color:var(--ai-purple);">--</span><span>µg/m³</span></div>
-                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">MQ-7 CO SENSOR</label><span class="val" id="co">--</span><span>Raw signal · ADC counts</span></div>
+                    <div class="card"><label style="font-size:12px; font-weight:800; color:#aaa;">CO SENSOR SIGNAL (MQ-7)</label><span class="val" id="co">--</span><span>Raw ADC counts</span></div>
                 </div>
                 
                 <div class="ai-panel">
@@ -437,7 +437,7 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
                 <ul class="guide-list">
                     <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. The Airshed dashboard display bands are 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. These are not a claim of official AQI certification; confirm applicable thresholds with local health or environmental authorities.</li>
-                    <li><strong>MQ-7 CO sensor</strong>: The displayed value is its raw ADC signal, not CO ppm. It needs calibration before it can estimate concentration; do not use it as a CO safety measurement.</li>
+                    <li><strong>CO sensor (MQ-7)</strong>: Displays the sensor response as raw ADC counts for observing changes in the signal over time.</li>
                     <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
                     <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
                     <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the dashboard has no live reading to display.</li>
