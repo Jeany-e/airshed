@@ -30,16 +30,6 @@ if (!$validDateInput($fromInput)) {
 if (!$validDateInput($toInput)) {
     $toInput = '';
 }
-$pollutantFields = [
-    'pm25' => ['field' => 'pm25', 'label' => 'PM2.5', 'unit' => 'µg/m³', 'min' => 0, 'max' => 1000],
-    'temp' => ['field' => 'temp', 'label' => 'Temperature', 'unit' => '°C', 'min' => -40, 'max' => 85],
-    'hum' => ['field' => 'hum', 'label' => 'Humidity', 'unit' => '%', 'min' => 0, 'max' => 100],
-    'co' => ['field' => 'co', 'label' => 'MQ-7 signal (raw ADC)', 'unit' => 'raw ADC', 'min' => 0, 'max' => 4095]
-];
-$pollutant = strtolower(trim($_GET['pollutant'] ?? 'pm25'));
-if (!isset($pollutantFields[$pollutant])) {
-    $pollutant = 'pm25';
-}
 $selectedSensor = trim($_GET['sensor'] ?? '');
 $days = [];
 $sensors = [];
@@ -191,14 +181,13 @@ $validValues = function (array $rows, $field, $minimum, $maximum) {
     return $values;
 };
 
-$selectedMetric = $pollutantFields[$pollutant];
-$metricValues = $validValues($selectedLogs, $selectedMetric['field'], $selectedMetric['min'], $selectedMetric['max']);
-$previousMetricValues = $validValues($previousLogs, $selectedMetric['field'], $selectedMetric['min'], $selectedMetric['max']);
-$metricAverage = $metricValues ? array_sum($metricValues) / count($metricValues) : null;
-$metricPeak = $metricValues ? max($metricValues) : null;
-$previousMetricAverage = $previousMetricValues ? array_sum($previousMetricValues) / count($previousMetricValues) : null;
-$averageDelta = $metricAverage !== null && $previousMetricAverage !== null
-    ? $metricAverage - $previousMetricAverage
+$pm25Values = $validValues($selectedLogs, 'pm25', 0, 1000);
+$previousPm25Values = $validValues($previousLogs, 'pm25', 0, 1000);
+$averagePm25 = $pm25Values ? array_sum($pm25Values) / count($pm25Values) : null;
+$peakPm25 = $pm25Values ? max($pm25Values) : null;
+$previousAveragePm25 = $previousPm25Values ? array_sum($previousPm25Values) / count($previousPm25Values) : null;
+$averageDelta = $averagePm25 !== null && $previousAveragePm25 !== null
+    ? $averagePm25 - $previousAveragePm25
     : null;
 $highReadings = array_values(array_filter($selectedLogs, function ($log) {
     return in_array(classifyPm25($log['pm25'] ?? null)['level'], ['UNHEALTHY', 'HAZARDOUS'], true);
@@ -213,8 +202,8 @@ foreach ($selectedLogs as $log) {
         continue;
     }
     $bucketKey = $period === 'daily' ? date('Y-m-d H:00', $timestamp) : date('Y-m-d', $timestamp);
-    $value = $log[$selectedMetric['field']] ?? null;
-    if (is_numeric($value) && is_finite((float) $value) && (float) $value >= $selectedMetric['min'] && (float) $value <= $selectedMetric['max']) {
+    $value = $log['pm25'] ?? null;
+    if (is_numeric($value) && is_finite((float) $value) && (float) $value >= 0 && (float) $value <= 1000) {
         $trendBuckets[$bucketKey][] = (float) $value;
     }
 }
@@ -228,9 +217,9 @@ foreach ($trendBuckets as $bucket => $values) {
 $reportTitle = $period === 'daily'
     ? date('l, F j, Y', strtotime($rangeStartDate))
     : date('M j, Y', strtotime($rangeStartDate)) . ' – ' . date('M j, Y', strtotime($rangeEndDate));
-$pollutantValue = function ($value) use ($selectedMetric) {
+$pm25Value = function ($value) {
     return is_numeric($value) && is_finite((float) $value)
-        ? number_format((float) $value, 1) . ' ' . $selectedMetric['unit']
+        ? number_format((float) $value, 1) . ' µg/m³'
         : '--';
 };
 $totalReportRows = count($selectedLogs);
@@ -242,7 +231,7 @@ $displayLogs = array_slice($selectedLogs, ($reportPage - 1) * $displayPageSize, 
 $generatorFromDate = $period === 'custom' && $filterWarning ? $fromInput : $rangeStartDate;
 $generatorToDate = $period === 'custom' && $filterWarning ? $toInput : $rangeEndDate;
 $reportQuery = $_GET;
-unset($reportQuery['export'], $reportQuery['report_page'], $reportQuery['search']);
+unset($reportQuery['export'], $reportQuery['report_page'], $reportQuery['search'], $reportQuery['pollutant']);
 $generatorQuery = $reportQuery;
 unset($generatorQuery['file_search']);
 $clearFileSearchUrl = $generatorQuery ? 'sensor_reports.php?' . http_build_query($generatorQuery) : 'sensor_reports.php';
@@ -347,8 +336,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         .report-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
         .record-files { margin-top: 24px; margin-bottom: 24px; }
         .record-files .panel-head { flex-wrap: wrap; }
-        .record-files .date-form { width: 100%; border: 0; border-radius: 0; border-top: 1px solid var(--line); padding: 16px 22px; }
-        .record-files .date-form .search-btn { width: auto; }
+        .report-generator-form { margin: 0 22px 12px; }
         .report-period-help { margin: 0; padding: 0 22px 14px; color: var(--muted); font-size: 12px; }
         .record-files .table-wrap { max-height: 260px; overflow-y: auto; animation: tableFloat 7s ease-in-out 1s infinite; }
         .record-files table { min-width: 0; }
@@ -574,7 +562,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             <div>
                 <h1>Sensor Reports</h1>
                 <p>
-                    Generate daily, weekly, monthly, or custom-range reports with pollutant trends, PM2.5 alerts, and sensor filters.
+                    Generate daily, weekly, monthly, or custom-range reports with PM2.5 trends, alerts, and sensor selection.
                 </p>
             </div>
         </section>
@@ -585,10 +573,10 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             <?php if ($filterWarning): ?><div class="error"><?php echo htmlspecialchars($filterWarning); ?></div><?php endif; ?>
             <section class="summary">
                 <div class="metric"><span class="metric-label">Device readings</span><strong class="metric-value"><?php echo number_format(count($selectedLogs)); ?></strong></div>
-                <div class="metric"><span class="metric-label">Valid <?php echo htmlspecialchars($selectedMetric['label']); ?></span><strong class="metric-value"><?php echo number_format(count($metricValues)); ?> / <?php echo number_format(count($selectedLogs)); ?></strong></div>
-                <div class="metric"><span class="metric-label">Average <?php echo htmlspecialchars($selectedMetric['label']); ?></span><strong class="metric-value"><?php echo $pollutantValue($metricAverage); ?></strong></div>
-                <div class="metric"><span class="metric-label">Change vs previous period</span><strong class="metric-value"><?php echo $averageDelta === null ? '--' : (($averageDelta > 0 ? '+' : '') . number_format($averageDelta, 1) . ' ' . $selectedMetric['unit']); ?></strong></div>
-                <div class="metric"><span class="metric-label">Peak <?php echo htmlspecialchars($selectedMetric['label']); ?></span><strong class="metric-value"><?php echo $pollutantValue($metricPeak); ?></strong></div>
+                <div class="metric"><span class="metric-label">Valid PM2.5 readings</span><strong class="metric-value"><?php echo number_format(count($pm25Values)); ?> / <?php echo number_format(count($selectedLogs)); ?></strong></div>
+                <div class="metric"><span class="metric-label">Average PM2.5</span><strong class="metric-value"><?php echo $pm25Value($averagePm25); ?></strong></div>
+                <div class="metric"><span class="metric-label">Change vs previous period</span><strong class="metric-value"><?php echo $averageDelta === null ? '--' : (($averageDelta > 0 ? '+' : '') . number_format($averageDelta, 1) . ' µg/m³'); ?></strong></div>
+                <div class="metric"><span class="metric-label">Peak PM2.5</span><strong class="metric-value"><?php echo $pm25Value($peakPm25); ?></strong></div>
                 <div class="metric"><span class="metric-label">PM2.5 unhealthy / hazardous</span><strong class="metric-value"><?php echo number_format(count($highReadings)); ?></strong></div>
             </section>
 
@@ -608,14 +596,14 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             <section class="panel chart-panel">
                 <div class="panel-head" style="padding: 0 0 18px; border-bottom: 0;">
                     <div>
-                        <h2><?php echo htmlspecialchars(ucfirst($period)); ?> <?php echo htmlspecialchars($selectedMetric['label']); ?> Trend</h2>
+                        <h2><?php echo htmlspecialchars(ucfirst($period)); ?> PM2.5 Trend</h2>
                         <span>Daily reports show hourly averages; longer reports show daily averages.</span>
                     </div>
                 </div>
                 <?php if ($trendLabels): ?>
                     <div class="chart-scroll"><div class="chart-wrap"><canvas id="reportChart"></canvas></div></div>
                 <?php else: ?>
-                    <div class="empty">No valid <?php echo htmlspecialchars($selectedMetric['label']); ?> measurements are available in this report.</div>
+                    <div class="empty">No valid PM2.5 measurements are available in this report.</div>
                 <?php endif; ?>
             </section>
 
@@ -629,18 +617,47 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                         <?php endif; ?>
                     </div>
                 </div>
+                <form class="date-form report-generator-form" method="get">
+                    <label for="period">Report period</label>
+                    <select id="period" name="period" onchange="updateReportDateRange()">
+                        <?php foreach (['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'custom' => 'Custom range'] as $periodValue => $periodLabel): ?>
+                            <option value="<?php echo $periodValue; ?>" <?php echo $period === $periodValue ? 'selected' : ''; ?>><?php echo $periodLabel; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label for="from">From date</label>
+                    <input id="from" name="from" type="date" value="<?php echo htmlspecialchars($generatorFromDate); ?>" aria-label="Report start date" onchange="updateReportDateRange()" required>
+                    <label for="to">To date</label>
+                    <input id="to" name="to" type="date" value="<?php echo htmlspecialchars($generatorToDate); ?>" aria-label="Report end date" required <?php echo $period === 'custom' ? '' : 'readonly'; ?>>
+                    <label for="sensor">Sensor</label>
+                    <select id="sensor" name="sensor">
+                        <option value="">All sensors</option>
+                        <?php $sensorIds = array_keys($sensors); sort($sensorIds, SORT_NATURAL | SORT_FLAG_CASE); ?>
+                        <?php foreach ($sensorIds as $sensorId): ?>
+                            <option value="<?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" <?php echo $selectedSensor === $sensorId ? 'selected' : ''; ?>><?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="search-btn" type="submit">Generate Report</button>
+                    <?php if ($selectedLogs): ?><a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Download CSV</a><?php endif; ?>
+                </form>
+                <p class="report-period-help">Daily covers one day; weekly covers Monday–Sunday; monthly covers the full calendar month. Custom range uses the dates entered.</p>
+                <?php $hasIdentifiedSensors = count(array_diff(array_keys($sensors), ['Unidentified sensor'])) > 0; ?>
+                <?php if (!$hasIdentifiedSensors): ?>
+                    <p class="sidebar-note" style="margin:0 22px 16px;">
+                        Current readings have no sensor ID; they are grouped as “Unidentified sensor.” Configure a sensor ID to enable accurate filtering for new readings.
+                    </p>
+                <?php endif; ?>
                 <?php if (!$selectedLogs): ?>
                     <div class="empty">No sensor readings match the selected report filters.</div>
                 <?php else: ?>
                     <div class="table-wrap">
                         <table>
-                            <thead><tr><th>Date and time</th><th>Sensor</th><th><?php echo htmlspecialchars($selectedMetric['label']); ?></th><th>PM2.5 category</th></tr></thead>
+                            <thead><tr><th>Date and time</th><th>Sensor</th><th>PM2.5</th><th>PM2.5 category</th></tr></thead>
                             <tbody>
                             <?php foreach ($displayLogs as $log): ?>
                                 <tr>
                                     <td><?php echo date('M j, Y h:i:s A', strtotime($log['timestamp'] ?? '')); ?></td>
                                     <td><?php echo htmlspecialchars($log['sensor_id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></td>
-                                    <td><?php echo $pollutantValue($log[$selectedMetric['field']] ?? null); ?></td>
+                                    <td><?php echo $pm25Value($log['pm25'] ?? null); ?></td>
                                     <?php $pmCategory = classifyPm25($log['pm25'] ?? null); ?>
                                     <td><span class="status" style="color:<?php echo htmlspecialchars($pmCategory['color'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>;"><?php echo htmlspecialchars($pmCategory['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></span></td>
                                 </tr>
@@ -665,46 +682,10 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                         <span><?php echo number_format(count($days)); ?> dates and <?php echo number_format($totalDeviceReadings); ?> device readings indexed in Firebase.</span>
                     </div>
                 </div>
-                <form class="date-form" method="get">
-                    <label for="period">Report period</label>
-                    <select id="period" name="period" onchange="updateReportDateRange()">
-                        <?php foreach (['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'custom' => 'Custom range'] as $periodValue => $periodLabel): ?>
-                            <option value="<?php echo $periodValue; ?>" <?php echo $period === $periodValue ? 'selected' : ''; ?>><?php echo $periodLabel; ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <label for="from">From date</label>
-                    <input id="from" name="from" type="date" value="<?php echo htmlspecialchars($generatorFromDate); ?>" aria-label="Report start date" onchange="updateReportDateRange()" required>
-                    <label for="to">To date</label>
-                    <input id="to" name="to" type="date" value="<?php echo htmlspecialchars($generatorToDate); ?>" aria-label="Report end date" required <?php echo $period === 'custom' ? '' : 'readonly'; ?>>
-                    <label for="pollutant">Pollutant</label>
-                    <select id="pollutant" name="pollutant">
-                        <?php foreach ($pollutantFields as $pollutantValue => $fieldDetails): ?>
-                            <option value="<?php echo $pollutantValue; ?>" <?php echo $pollutant === $pollutantValue ? 'selected' : ''; ?>><?php echo htmlspecialchars($fieldDetails['label']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <label for="sensor">Sensor</label>
-                    <select id="sensor" name="sensor">
-                        <option value="">All sensors</option>
-                        <?php $sensorIds = array_keys($sensors); sort($sensorIds, SORT_NATURAL | SORT_FLAG_CASE); ?>
-                        <?php foreach ($sensorIds as $sensorId): ?>
-                            <option value="<?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" <?php echo $selectedSensor === $sensorId ? 'selected' : ''; ?>><?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button class="search-btn" type="submit">Generate Report</button>
-                    <?php if ($selectedLogs): ?><a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Export CSV</a><?php endif; ?>
-                </form>
-                <p class="report-period-help">Daily covers one day; weekly covers Monday–Sunday; monthly covers the full calendar month. Custom range uses the dates entered.</p>
-                <?php $hasIdentifiedSensors = count(array_diff(array_keys($sensors), ['Unidentified sensor'])) > 0; ?>
-                <?php if (!$hasIdentifiedSensors): ?>
-                    <p class="sidebar-note" style="margin:0 22px 16px;">
-                        Current readings have no sensor ID; they are grouped as “Unidentified sensor.” Configure a sensor ID to enable accurate filtering for new readings.
-                    </p>
-                <?php endif; ?>
                 <form class="record-file-search" method="get">
                     <input type="hidden" name="period" value="<?php echo htmlspecialchars($period); ?>">
                     <input type="hidden" name="from" value="<?php echo htmlspecialchars($generatorFromDate); ?>">
                     <input type="hidden" name="to" value="<?php echo htmlspecialchars($generatorToDate); ?>">
-                    <input type="hidden" name="pollutant" value="<?php echo htmlspecialchars($pollutant); ?>">
                     <input type="hidden" name="sensor" value="<?php echo htmlspecialchars($selectedSensor); ?>">
                     <label for="file-search">Search Record Files</label>
                     <input id="file-search" name="file_search" type="search" placeholder="Search date or reading count" value="<?php echo htmlspecialchars($recordFileSearch); ?>">
@@ -791,14 +772,13 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
 
         const chartLabels = <?php echo json_encode($trendLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
         const chartValues = <?php echo json_encode($trendValues, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
-        const selectedPollutantUnit = <?php echo json_encode($selectedMetric['unit']); ?>;
         const chartCanvas = document.getElementById('reportChart');
         if (chartCanvas) new Chart(chartCanvas, {
             type: 'line',
             data: {
                 labels: chartLabels,
                 datasets: [{
-                    label: <?php echo json_encode($selectedMetric['label']); ?>,
+                    label: 'PM2.5',
                     data: chartValues,
                     borderColor: '#174ea6',
                     backgroundColor: 'rgba(23,78,166,.12)',
@@ -810,7 +790,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
-                scales: { y: { title: { display: true, text: selectedPollutantUnit } } }
+                scales: { y: { title: { display: true, text: 'µg/m³' } } }
             }
         });
 
