@@ -436,10 +436,10 @@ $profileMessage = isset($_GET['profile_updated']) ? 'Profile updated successfull
                 <h3>How to Read Your Airshed Dashboard</h3>
                 <p>These guidelines explain what each measurement is, what it is for, and what action to take.</p>
                 <ul class="guide-list">
-                    <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. The Airshed dashboard display bands are 0-12 µg/m³ = Good, above 12-35 = Moderate, above 35-150 = Unhealthy, and above 150-1000 = Hazardous. These are not a claim of official AQI certification; confirm applicable thresholds with local health or environmental authorities.</li>
-                    <li><strong>CO sensor (MQ-7)</strong>: Displays the sensor response as raw ADC counts for observing changes in the signal over time.</li>
-                    <li><strong>Temperature</strong>: Current outdoor temperature from the weather service. At 33°C or higher, stay hydrated and limit heat exposure.</li>
-                    <li><strong>Humidity</strong>: Current outdoor relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
+                    <li><strong>PM2.5</strong>: Fine particles from smoke, dust, and combustion. The app accepts 0-1000 µg/m³; display bands are 0-12 = Good, &gt;12-35 = Moderate, &gt;35-150 = Unhealthy, and &gt;150-1000 = Hazardous. These are not a claim of official AQI certification; confirm applicable thresholds with local health or environmental authorities.</li>
+                    <li><strong>CO sensor (MQ-7)</strong>: The app accepts raw readings from 0-4095 ADC counts. These show the sensor signal, not CO concentration (ppm); there are no safe/unsafe ranges until the sensor is calibrated.</li>
+                    <li><strong>Temperature</strong>: The app accepts -40 to 85°C. This is the current outdoor temperature from the weather service; at 33°C or higher, stay hydrated and limit heat exposure.</li>
+                    <li><strong>Humidity</strong>: The app accepts 0-100% relative humidity. At 85% or higher, expect very humid conditions and take extra care outdoors.</li>
                     <li><strong>System status</strong>: Online means recent sensor data is available; Offline means the dashboard has no live reading to display.</li>
                 </ul>
             </div>
