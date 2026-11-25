@@ -658,9 +658,9 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                         <?php endforeach; ?>
                     </select>
                     <label for="from">From date</label>
-                    <input id="from" name="from" type="text" inputmode="numeric" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" maxlength="10" placeholder="DD/MM/YYYY" value="<?php echo htmlspecialchars($displayFromDate, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" aria-label="Report start date (DD/MM/YYYY)" title="Use DD/MM/YYYY" onchange="updateReportDateRange()" required>
+                    <input id="from" name="from" type="text" inputmode="numeric" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" maxlength="10" placeholder="DD/MM/YYYY" value="<?php echo htmlspecialchars($displayFromDate, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" aria-label="Report start date (DD/MM/YYYY)" title="Use DD/MM/YYYY" onchange="switchToCustomReportRange()" required>
                     <label for="to">To date</label>
-                    <input id="to" name="to" type="text" inputmode="numeric" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" maxlength="10" placeholder="DD/MM/YYYY" value="<?php echo htmlspecialchars($displayToDate, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" aria-label="Report end date (DD/MM/YYYY)" title="Use DD/MM/YYYY" required <?php echo $period === 'custom' ? '' : 'readonly'; ?>>
+                    <input id="to" name="to" type="text" inputmode="numeric" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" maxlength="10" placeholder="DD/MM/YYYY" value="<?php echo htmlspecialchars($displayToDate, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" aria-label="Report end date (DD/MM/YYYY)" title="Use DD/MM/YYYY" onchange="switchToCustomReportRange()" required <?php echo $period === 'custom' ? '' : 'readonly'; ?>>
                     <label for="sensor">Sensor</label>
                     <select id="sensor" name="sensor">
                         <option value="">All sensors</option>
@@ -672,7 +672,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                     <button class="search-btn" type="submit">Generate Report</button>
                     <?php if ($selectedLogs): ?><a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Download CSV</a><?php endif; ?>
                 </form>
-                <p class="report-period-help">Enter dates as DD/MM/YYYY. Daily covers one day; weekly covers Monday–Sunday; monthly covers the full calendar month. Custom range uses the dates entered.</p>
+                <p class="report-period-help">Enter dates as DD/MM/YYYY. Typing a date switches to Custom range; preset daily, weekly, and monthly periods use their full date ranges.</p>
                 <?php $hasIdentifiedSensors = count(array_diff(array_keys($sensors), ['Unidentified sensor'])) > 0; ?>
                 <?php if (!$hasIdentifiedSensors): ?>
                     <p class="sidebar-note" style="margin:0 22px 16px;">
@@ -784,6 +784,17 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             const date = new Date(year, month, day, 12);
             if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
             return date;
+        }
+
+        function switchToCustomReportRange() {
+            const periodInput = document.getElementById('period');
+            const fromInput = document.getElementById('from');
+            const toInput = document.getElementById('to');
+            if (periodInput.value !== 'custom') {
+                periodInput.value = 'custom';
+                toInput.value = fromInput.value;
+            }
+            updateReportDateRange();
         }
 
         function updateReportDateRange() {
