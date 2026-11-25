@@ -232,6 +232,12 @@ $pm25Value = function ($value) {
         ? number_format((float) $value, 1) . ' µg/m³'
         : '--';
 };
+$formatMetricValue = function ($value, $minimum, $maximum, $unit) {
+    if (!is_numeric($value) || !is_finite((float) $value) || (float) $value < $minimum || (float) $value > $maximum) {
+        return '--';
+    }
+    return number_format((float) $value, 1) . ' ' . $unit;
+};
 $totalReportRows = count($selectedLogs);
 $totalReportPages = max(1, (int) ceil($totalReportRows / $displayPageSize));
 $reportPage = min($requestedReportPage, $totalReportPages);
@@ -370,7 +376,12 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         .record-files { margin-top: 24px; margin-bottom: 24px; }
         .record-files .panel-head { flex-wrap: wrap; }
         .report-generator-form { margin: 0 22px 12px; }
+        .report-generator-form .search-btn { min-height: 40px; white-space: nowrap; }
         .report-period-help { margin: 0; padding: 0 22px 14px; color: var(--muted); font-size: 12px; }
+        .report-metric-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 0 22px 14px; }
+        .report-metric-tab { flex: 0 0 auto; padding: 9px 14px; border: 1px solid var(--line); border-radius: 999px; background: #f9fbfe; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+        .report-metric-tab[aria-pressed="true"] { border-color: var(--blue); background: var(--blue); color: #fff; }
+        .report-metric-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
         .record-files .table-wrap { max-height: 260px; overflow-y: auto; animation: tableFloat 7s ease-in-out 1s infinite; }
         .record-files table { min-width: 0; }
         .view-date { display: inline-block; padding: 7px 11px; border-radius: 8px; background: var(--blue-soft); color: var(--blue); text-decoration: none; font-size: 12px; font-weight: 700; }
@@ -669,10 +680,10 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                             <option value="<?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" <?php echo $selectedSensor === $sensorId ? 'selected' : ''; ?>><?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <button class="search-btn" type="submit">Search / Generate Report</button>
+                    <button class="search-btn" type="submit">Generate Report</button>
                     <?php if ($selectedLogs): ?><a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Download CSV</a><?php endif; ?>
                 </form>
-                <p class="report-period-help">Enter dates as DD/MM/YYYY, then select Search / Generate Report. Typing will not change either date; editing a date switches to Custom range.</p>
+                <p class="report-period-help">Enter dates as DD/MM/YYYY, then select Generate Report to search the selected dates and sensor. Typing will not change either date; editing a date switches to Custom range.</p>
                 <?php $hasIdentifiedSensors = count(array_diff(array_keys($sensors), ['Unidentified sensor'])) > 0; ?>
                 <?php if (!$hasIdentifiedSensors): ?>
                     <p class="sidebar-note" style="margin:0 22px 16px;">
@@ -682,17 +693,27 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                 <?php if (!$selectedLogs): ?>
                     <div class="empty">No sensor readings match the selected report filters.</div>
                 <?php else: ?>
+                    <div class="report-metric-tabs" role="group" aria-label="Select measurement shown in the readings table">
+                        <button class="report-metric-tab" type="button" data-report-metric="pm25" aria-pressed="true">PM2.5</button>
+                        <button class="report-metric-tab" type="button" data-report-metric="temp" aria-pressed="false">Temperature</button>
+                        <button class="report-metric-tab" type="button" data-report-metric="hum" aria-pressed="false">Humidity</button>
+                        <button class="report-metric-tab" type="button" data-report-metric="co" aria-pressed="false">MQ-7 (raw ADC)</button>
+                    </div>
                     <div class="table-wrap">
                         <table>
-                            <thead><tr><th>Date and time</th><th>Sensor</th><th>PM2.5</th><th>PM2.5 category</th></tr></thead>
+                            <thead><tr><th>Date and time</th><th>Sensor</th><th id="readingMetricHeader">PM2.5 (µg/m³)</th><th id="pm25CategoryHeader">PM2.5 category</th></tr></thead>
                             <tbody>
                             <?php foreach ($displayLogs as $log): ?>
-                                <tr>
+                                <tr class="report-reading-row"
+                                    data-pm25="<?php echo htmlspecialchars($formatMetricValue($log['pm25'] ?? null, 0, 1000, 'µg/m³'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
+                                    data-temp="<?php echo htmlspecialchars($formatMetricValue($log['temp'] ?? null, -40, 85, '°C'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
+                                    data-hum="<?php echo htmlspecialchars($formatMetricValue($log['hum'] ?? null, 0, 100, '%'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
+                                    data-co="<?php echo htmlspecialchars($formatMetricValue($log['co'] ?? null, 0, 4095, 'raw ADC'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">
                                     <td><?php echo date('M j, Y h:i:s A', strtotime($log['timestamp'] ?? '')); ?></td>
                                     <td><?php echo htmlspecialchars($log['sensor_id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></td>
-                                    <td><?php echo $pm25Value($log['pm25'] ?? null); ?></td>
+                                    <td class="reading-metric-value"><?php echo $formatMetricValue($log['pm25'] ?? null, 0, 1000, 'µg/m³'); ?></td>
                                     <?php $pmCategory = classifyPm25($log['pm25'] ?? null); ?>
-                                    <td><span class="status" style="color:<?php echo htmlspecialchars($pmCategory['color'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>;"><?php echo htmlspecialchars($pmCategory['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></span></td>
+                                    <td class="pm25-category"><span class="status" style="color:<?php echo htmlspecialchars($pmCategory['color'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>;"><?php echo htmlspecialchars($pmCategory['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -821,6 +842,29 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         }
         const chartLabels = <?php echo json_encode($trendLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
         const chartValues = <?php echo json_encode($trendValues, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+        const reportMetricConfig = {
+            pm25: { heading: 'PM2.5 (µg/m³)', hasCategory: true },
+            temp: { heading: 'Temperature (°C)', hasCategory: false },
+            hum: { heading: 'Humidity (%)', hasCategory: false },
+            co: { heading: 'MQ-7 signal (raw ADC)', hasCategory: false }
+        };
+        document.querySelectorAll('.report-metric-tab').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const metric = button.dataset.reportMetric;
+                const config = reportMetricConfig[metric];
+                if (!config) return;
+
+                document.getElementById('readingMetricHeader').textContent = config.heading;
+                document.getElementById('pm25CategoryHeader').hidden = !config.hasCategory;
+                document.querySelectorAll('.report-reading-row').forEach(function (row) {
+                    row.querySelector('.reading-metric-value').textContent = row.dataset[metric];
+                    row.querySelector('.pm25-category').hidden = !config.hasCategory;
+                });
+                document.querySelectorAll('.report-metric-tab').forEach(function (tab) {
+                    tab.setAttribute('aria-pressed', tab === button ? 'true' : 'false');
+                });
+            });
+        });
         const chartCanvas = document.getElementById('reportChart');
         if (chartCanvas) new Chart(chartCanvas, {
             type: 'line',
