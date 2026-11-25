@@ -41,6 +41,25 @@ $readStatus = function ($key, $default = '') use ($input) {
     $value = $input[$key] ?? $default;
     return is_scalar($value) ? substr((string) $value, 0, 32) : $default;
 };
+$readMetadata = function (array $keys, $environmentName) use ($input) {
+    $value = null;
+    foreach ($keys as $key) {
+        $candidate = $input[$key] ?? null;
+        if (is_scalar($candidate) && trim((string) $candidate) !== '') {
+            $value = $candidate;
+            break;
+        }
+    }
+    if ($value === null) {
+        $value = getenv($environmentName);
+    }
+    if (!is_scalar($value)) {
+        return null;
+    }
+    $value = trim((string) $value);
+    return $value === '' ? null : substr($value, 0, 100);
+};
+$sensorId = $readMetadata(['sensor_id', 'device_id'], 'AIRSHED_DEVICE_ID');
 $timestamp = gmdate('c');
 try {
     firebasePush('sensor_data', [
@@ -53,7 +72,7 @@ try {
         'co_status' => $readStatus('coStatus'),
         'timestamp' => $timestamp
     ]);
-    firebasePush('sensor_logs', [
+    $sensorLog = [
         'source' => 'device',
         'temp' => $temp,
         'hum' => $hum,
@@ -61,7 +80,11 @@ try {
         'pm25' => $pm25,
         'status' => $readStatus('status', 'UNKNOWN'),
         'timestamp' => $timestamp
-    ]);
+    ];
+    if ($sensorId !== null) {
+        $sensorLog['sensor_id'] = $sensorId;
+    }
+    firebasePush('sensor_logs', $sensorLog);
     echo 'Data inserted successfully';
 } catch (Throwable $error) {
     error_log('Device ingestion failed: ' . $error->getMessage());

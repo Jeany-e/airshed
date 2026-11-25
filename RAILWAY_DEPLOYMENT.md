@@ -16,12 +16,16 @@ Create a repository containing this project folder, including `Dockerfile`,
 
    `AIRSHED_DEVICE_TOKEN` = a long random token also configured on the IoT device
 
+   `AIRSHED_DEVICE_ID` = the device's stable sensor identifier
+
 5. Generate a public domain under **Settings > Networking > Public Networking**.
 
 The IoT device can keep its existing GET/POST request fields when calling
 `AirshedProject/insert_data.php`, but it must send the matching token in an
 `X-Device-Token` header or `device_token` POST field. Do not put the token in
-the URL. Without the matching token, the endpoint rejects readings.
+the URL. Without the matching token, the endpoint rejects readings. Send
+`sensor_id` with each reading, or set `AIRSHED_DEVICE_ID`, so new report records
+can be filtered by sensor. Historical records without metadata remain unidentified.
 
 The Dockerfile reads Railway's `PORT` variable, so no fixed application port
 needs to be configured in Railway.

@@ -37,13 +37,17 @@ an `X-Device-Token` header (preferred) or as a `device_token` POST field:
 
 ```apache
 SetEnv AIRSHED_DEVICE_TOKEN "YOUR_PRIVATE_DEVICE_TOKEN"
+SetEnv AIRSHED_DEVICE_ID "YOUR_SENSOR_ID"
 ```
 
 Send the existing `temp`/`temperature`, `hum`/`humidity`, `co`/`mq_adc`, and
 `pm25` fields. The `co` value is raw MQ ADC, not calibrated CO ppm. The endpoint
 rejects requests without the token and validates sensor ranges before saving.
+Send `sensor_id` with each device reading when available, or configure
+`AIRSHED_DEVICE_ID` as the server default so reports can filter by sensor.
+Older readings without this metadata remain labeled as unidentified.
 Do not put the token in the URL. The former browser dashboard write endpoint
-returns `410`. Restart Apache after adding the token.
+returns `410`. Restart Apache after adding the variables.
 
 ## 4. Confirm PHP requirements
 

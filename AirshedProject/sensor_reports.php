@@ -5,20 +5,46 @@ date_default_timezone_set('Asia/Manila');
 unset($_SESSION['sensor_reports_logs_cache']);
 $isAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 $error = '';
+$filterWarning = '';
 $reportPageSize = 5000;
-$requestedDay = trim($_GET['day'] ?? '');
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDay)) {
-    $requestedDay = '';
+$displayPageSize = 200;
+$requestedReportPage = max(1, (int) ($_GET['report_page'] ?? 1));
+$period = strtolower(trim($_GET['period'] ?? 'daily'));
+if (!in_array($period, ['daily', 'weekly', 'monthly', 'custom'], true)) {
+    $period = 'daily';
+}
+$requestedDate = trim($_GET['date'] ?? $_GET['day'] ?? '');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate) || !checkdate((int) substr($requestedDate, 5, 2), (int) substr($requestedDate, 8, 2), (int) substr($requestedDate, 0, 4))) {
+    $requestedDate = '';
 }
 $searchTerm = trim($_GET['search'] ?? '');
 $fromInput = trim($_GET['from'] ?? '');
 $toInput = trim($_GET['to'] ?? '');
-$fromTimestamp = $fromInput ? strtotime($fromInput) : null;
-$toTimestamp = $toInput ? strtotime($toInput) : null;
+$validDateInput = function ($value) {
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)
+        && checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4));
+};
+if (!$validDateInput($fromInput)) {
+    $fromInput = '';
+}
+if (!$validDateInput($toInput)) {
+    $toInput = '';
+}
+$pollutantFields = [
+    'pm25' => ['field' => 'pm25', 'label' => 'PM2.5', 'unit' => 'µg/m³', 'min' => 0, 'max' => 1000],
+    'temp' => ['field' => 'temp', 'label' => 'Temperature', 'unit' => '°C', 'min' => -40, 'max' => 85],
+    'hum' => ['field' => 'hum', 'label' => 'Humidity', 'unit' => '%', 'min' => 0, 'max' => 100],
+    'co' => ['field' => 'co', 'label' => 'MQ-7 signal (raw ADC)', 'unit' => 'raw ADC', 'min' => 0, 'max' => 4095]
+];
+$pollutant = strtolower(trim($_GET['pollutant'] ?? 'pm25'));
+if (!isset($pollutantFields[$pollutant])) {
+    $pollutant = 'pm25';
+}
+$selectedSensor = trim($_GET['sensor'] ?? '');
 $days = [];
+$sensors = [];
 $totalDeviceReadings = 0;
 $selectedLogs = [];
-$previousDayLogs = [];
 
 $fetchRows = function (array $query) {
     try {
@@ -38,28 +64,35 @@ $normalizeDeviceLog = function (array $log) {
     $log['hum'] = $log['hum'] ?? $log['humidity'] ?? null;
     $log['co'] = $log['co'] ?? $log['co_ppm'] ?? null;
     $log['pm25'] = $log['pm25'] ?? $log['pm2_5'] ?? $log['pm2.5'] ?? null;
+    $sensorId = $log['sensor_id'] ?? '';
+    if (!is_scalar($sensorId) || trim((string) $sensorId) === '') {
+        $sensorId = $log['device_id'] ?? '';
+    }
+    $log['sensor_id'] = is_scalar($sensorId) ? trim((string) $sensorId) : '';
+    if ($log['sensor_id'] === '') {
+        $log['sensor_id'] = 'Unidentified sensor';
+    }
     return $log;
 };
 
-$loadDayLogs = function ($day) use ($fetchRows, $normalizeDeviceLog) {
-    $dayStart = strtotime($day . ' 00:00:00');
-    $dayEnd = strtotime($day . ' +1 day') - 1;
+$loadRangeLogs = function ($startTimestamp, $endTimestamp) use ($fetchRows, $normalizeDeviceLog) {
     $rows = $fetchRows([
         'orderBy' => '"timestamp"',
-        'startAt' => json_encode(gmdate('c', $dayStart)),
-        'endAt' => json_encode(gmdate('c', $dayEnd))
+        'startAt' => json_encode(gmdate('c', $startTimestamp)),
+        'endAt' => json_encode(gmdate('c', $endTimestamp))
     ]);
-    $dayLogs = [];
+    $rangeLogs = [];
     foreach ($rows as $row) {
         $log = $normalizeDeviceLog($row);
-        if ($log !== null && date('Y-m-d', strtotime($log['timestamp'])) === $day) {
-            $dayLogs[] = $log;
+        $timestamp = $log === null ? false : strtotime($log['timestamp']);
+        if ($log !== null && $timestamp >= $startTimestamp && $timestamp <= $endTimestamp) {
+            $rangeLogs[] = $log;
         }
     }
-    usort($dayLogs, function ($a, $b) {
+    usort($rangeLogs, function ($a, $b) {
         return strcmp($b['timestamp'] ?? '', $a['timestamp'] ?? '');
     });
-    return $dayLogs;
+    return $rangeLogs;
 };
 
 try {
@@ -90,97 +123,162 @@ try {
             }
             $day = date('Y-m-d', strtotime($log['timestamp']));
             $days[$day] = ($days[$day] ?? 0) + 1;
+            $sensors[$log['sensor_id']] = true;
             $totalDeviceReadings++;
         }
     } while ($pageCount >= $reportPageSize);
 
     krsort($days, SORT_STRING);
-    $selectedDay = isset($days[$requestedDay])
-        ? $requestedDay
-        : (array_key_first($days) ?: date('Y-m-d'));
-    $previousDay = date('Y-m-d', strtotime($selectedDay . ' -1 day'));
-    $selectedLogs = $loadDayLogs($selectedDay);
-    $previousDayLogs = isset($days[$previousDay]) ? $loadDayLogs($previousDay) : [];
-    $dailyLogs = $selectedLogs;
-
-    if ($searchTerm !== '' || $fromTimestamp || $toTimestamp) {
-        $selectedLogs = array_values(array_filter($selectedLogs, function ($log) use ($searchTerm, $fromTimestamp, $toTimestamp) {
+    $selectedDate = $requestedDate ?: (array_key_first($days) ?: date('Y-m-d'));
+    $rangeStartDate = $selectedDate;
+    $rangeEndDate = $selectedDate;
+    if ($period === 'weekly') {
+        $weekStart = strtotime($selectedDate . ' -' . ((int) date('N', strtotime($selectedDate)) - 1) . ' days');
+        $rangeStartDate = date('Y-m-d', $weekStart);
+        $rangeEndDate = date('Y-m-d', strtotime($rangeStartDate . ' +6 days'));
+    } elseif ($period === 'monthly') {
+        $rangeStartDate = date('Y-m-01', strtotime($selectedDate));
+        $rangeEndDate = date('Y-m-t', strtotime($selectedDate));
+    } elseif ($period === 'custom') {
+        if ($fromInput && $toInput && $fromInput <= $toInput) {
+            $rangeStartDate = $fromInput;
+            $rangeEndDate = $toInput;
+        } else {
+            $filterWarning = 'Choose valid start and end dates, with the start date on or before the end date.';
+        }
+    }
+    $rangeStart = strtotime($rangeStartDate . ' 00:00:00');
+    $rangeEnd = strtotime($rangeEndDate . ' 23:59:59');
+    $rangeSeconds = $rangeEnd - $rangeStart + 1;
+    $previousStart = $rangeStart - $rangeSeconds;
+    $previousEnd = $rangeStart - 1;
+    $selectedLogs = $loadRangeLogs($rangeStart, $rangeEnd);
+    $previousLogs = $loadRangeLogs($previousStart, $previousEnd);
+    if ($selectedSensor !== '' && !isset($sensors[$selectedSensor])) {
+        $selectedSensor = '';
+    }
+    $filterReportLogs = function (array $logs, $applySearch = true) use ($selectedSensor, $searchTerm) {
+        return array_values(array_filter($logs, function ($log) use ($selectedSensor, $searchTerm, $applySearch) {
+            if ($selectedSensor !== '' && $log['sensor_id'] !== $selectedSensor) {
+                return false;
+            }
             $timestamp = strtotime($log['timestamp'] ?? '');
             $haystack = strtolower(implode(' ', [
                 $log['timestamp'] ?? '',
                 $timestamp ? date('M d Y h:i A', $timestamp) : '',
+                $log['sensor_id'] ?? '',
                 $log['temp'] ?? '',
                 $log['hum'] ?? '',
                 $log['pm25'] ?? '',
                 $log['co'] ?? '',
                 $log['status'] ?? ''
             ]));
-
-            return $timestamp
-                && (!$fromTimestamp || $timestamp >= $fromTimestamp)
-                && (!$toTimestamp || $timestamp <= $toTimestamp)
-                && ($searchTerm === '' || strpos($haystack, strtolower($searchTerm)) !== false);
+            return !$applySearch || $searchTerm === '' || strpos($haystack, strtolower($searchTerm)) !== false;
         }));
-    }
+    };
+    $selectedLogs = $filterReportLogs($selectedLogs);
+    $previousLogs = $filterReportLogs($previousLogs, false);
 } catch (Throwable $exception) {
     error_log('Sensor report history unavailable: ' . $exception->getMessage());
     $error = 'Sensor history is temporarily unavailable.';
     $days = [];
     $selectedLogs = [];
-    $previousDayLogs = [];
-    $dailyLogs = [];
-    $selectedDay = $requestedDay ?: date('Y-m-d');
-    $previousDay = date('Y-m-d', strtotime($selectedDay . ' -1 day'));
+    $previousLogs = [];
+    $selectedDate = $requestedDate ?: date('Y-m-d');
+    $rangeStartDate = $selectedDate;
+    $rangeEndDate = $selectedDate;
+    $rangeStart = strtotime($rangeStartDate . ' 00:00:00');
+    $rangeEnd = strtotime($rangeEndDate . ' 23:59:59');
 }
 
-$average = function ($field, array $rows) {
-    $limits = [
-        'temp' => [-40, 85],
-        'hum' => [0, 100]
-    ];
-    $values = array_map(function ($log) use ($field) {
-        $value = $log[$field] ?? null;
-        if (!is_numeric($value) || !is_finite((float) $value)) {
-            return null;
-        }
-        return (float) $value;
-    }, $rows);
-    $values = array_values(array_filter($values, function ($value) {
-        return $value !== null;
-    }));
-    if (isset($limits[$field])) {
-        $values = array_values(array_filter($values, function ($value) use ($limits, $field) {
-            return $value >= $limits[$field][0] && $value <= $limits[$field][1];
-        }));
-    }
-    return count($values) ? array_sum($values) / count($values) : null;
-};
-
-$validPm25 = function (array $rows) {
+$validValues = function (array $rows, $field, $minimum, $maximum) {
     $values = [];
     foreach ($rows as $row) {
-        $value = $row['pm25'] ?? null;
-        if (is_numeric($value) && is_finite((float) $value) && (float) $value >= 0 && (float) $value <= 1000) {
+        $value = $row[$field] ?? null;
+        if (is_numeric($value) && is_finite((float) $value) && (float) $value >= $minimum && (float) $value <= $maximum) {
             $values[] = (float) $value;
         }
     }
     return $values;
 };
 
-$dailyPm25 = $validPm25($dailyLogs);
-$previousPm25 = $validPm25($previousDayLogs);
-$averageTemp = $average('temp', $dailyLogs);
-$averageHumidity = $average('hum', $dailyLogs);
-$maxPm25 = $dailyPm25 ? max($dailyPm25) : null;
-$dailyHighReadings = array_values(array_filter($dailyLogs, function ($log) {
+$selectedMetric = $pollutantFields[$pollutant];
+$metricValues = $validValues($selectedLogs, $selectedMetric['field'], $selectedMetric['min'], $selectedMetric['max']);
+$previousMetricValues = $validValues($previousLogs, $selectedMetric['field'], $selectedMetric['min'], $selectedMetric['max']);
+$metricAverage = $metricValues ? array_sum($metricValues) / count($metricValues) : null;
+$metricPeak = $metricValues ? max($metricValues) : null;
+$previousMetricAverage = $previousMetricValues ? array_sum($previousMetricValues) / count($previousMetricValues) : null;
+$averageDelta = $metricAverage !== null && $previousMetricAverage !== null
+    ? $metricAverage - $previousMetricAverage
+    : null;
+$highReadings = array_values(array_filter($selectedLogs, function ($log) {
     return in_array(classifyPm25($log['pm25'] ?? null)['level'], ['UNHEALTHY', 'HAZARDOUS'], true);
 }));
-usort($dailyHighReadings, function ($a, $b) {
+usort($highReadings, function ($a, $b) {
     return strcmp($a['timestamp'] ?? '', $b['timestamp'] ?? '');
 });
-$averageDelta = $dailyPm25 && $previousPm25
-    ? array_sum($dailyPm25) / count($dailyPm25) - array_sum($previousPm25) / count($previousPm25)
-    : null;
+$trendBuckets = [];
+foreach ($selectedLogs as $log) {
+    $timestamp = strtotime($log['timestamp'] ?? '');
+    if (!$timestamp) {
+        continue;
+    }
+    $bucketKey = $period === 'daily' ? date('Y-m-d H:00', $timestamp) : date('Y-m-d', $timestamp);
+    $value = $log[$selectedMetric['field']] ?? null;
+    if (is_numeric($value) && is_finite((float) $value) && (float) $value >= $selectedMetric['min'] && (float) $value <= $selectedMetric['max']) {
+        $trendBuckets[$bucketKey][] = (float) $value;
+    }
+}
+$trendLabels = [];
+$trendValues = [];
+ksort($trendBuckets);
+foreach ($trendBuckets as $bucket => $values) {
+    $trendLabels[] = $period === 'daily' ? date('h A', strtotime($bucket . ':00')) : date('M j', strtotime($bucket));
+    $trendValues[] = array_sum($values) / count($values);
+}
+$reportTitle = $period === 'daily'
+    ? date('l, F j, Y', strtotime($rangeStartDate))
+    : date('M j, Y', strtotime($rangeStartDate)) . ' – ' . date('M j, Y', strtotime($rangeEndDate));
+$pollutantValue = function ($value) use ($selectedMetric) {
+    return is_numeric($value) && is_finite((float) $value)
+        ? number_format((float) $value, 1) . ' ' . $selectedMetric['unit']
+        : '--';
+};
+$totalReportRows = count($selectedLogs);
+$totalReportPages = max(1, (int) ceil($totalReportRows / $displayPageSize));
+$reportPage = min($requestedReportPage, $totalReportPages);
+$firstReportRow = $totalReportRows ? (($reportPage - 1) * $displayPageSize) + 1 : 0;
+$lastReportRow = min($reportPage * $displayPageSize, $totalReportRows);
+$displayLogs = array_slice($selectedLogs, ($reportPage - 1) * $displayPageSize, $displayPageSize);
+$reportQuery = $_GET;
+unset($reportQuery['export'], $reportQuery['report_page']);
+$exportQuery = $reportQuery;
+$exportQuery['export'] = 'csv';
+$exportUrl = 'sensor_reports.php?' . http_build_query($exportQuery);
+$reportPageUrl = function ($page) use ($reportQuery) {
+    $query = $reportQuery;
+    $query['report_page'] = $page;
+    return 'sensor_reports.php?' . http_build_query($query);
+};
+if (($_GET['export'] ?? '') === 'csv' && !$error) {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="Airshed_Report_' . $period . '_' . $rangeStartDate . '_to_' . $rangeEndDate . '.csv"');
+    $output = fopen('php://output', 'wb');
+    fputcsv($output, ['Timestamp', 'Sensor ID', 'Temperature (C)', 'Humidity (%)', 'PM2.5 (ug/m3)', 'MQ-7 signal (raw ADC)', 'PM2.5 category']);
+    foreach ($selectedLogs as $log) {
+        fputcsv($output, [
+            $log['timestamp'] ?? '',
+            $log['sensor_id'] ?? 'Unidentified sensor',
+            $log['temp'] ?? '',
+            $log['hum'] ?? '',
+            $log['pm25'] ?? '',
+            $log['co'] ?? '',
+            classifyPm25($log['pm25'] ?? null)['label']
+        ]);
+    }
+    fclose($output);
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -240,8 +338,9 @@ $averageDelta = $dailyPm25 && $previousPm25
         .panel-head h2 { font-size: 19px; }
         .panel-head span { color: var(--muted); font-size: 13px; }
         .panel-actions { display: flex; align-items: center; gap: 10px; }
-        .export-btn { border: 0; border-radius: 8px; padding: 9px 13px; background: var(--blue); color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .export-btn { display: inline-block; border: 0; border-radius: 8px; padding: 9px 13px; background: var(--blue); color: #fff; text-decoration: none; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
         .export-btn:hover { opacity: .88; }
+        .report-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
         .record-files { margin-top: 24px; margin-bottom: 24px; }
         .record-files .panel-head { flex-wrap: wrap; }
         .record-files .date-form { width: 100%; border: 0; border-radius: 0; border-top: 1px solid var(--line); padding: 16px 22px; }
@@ -422,6 +521,17 @@ $averageDelta = $dailyPm25 && $previousPm25
             .sidebar-backdrop.open { display: block; }
             .header { padding-left: 66px; }
         }
+        @media print {
+            body { background: #fff; animation: none; }
+            .sidebar, .header, .mobile-menu-toggle, .sidebar-backdrop, .date-form, .panel-actions, .report-pagination, .record-files { display: none !important; }
+            .app-shell, .main, .main main { display: block; width: 100%; margin: 0; }
+            .main main { padding: 12px; }
+            .metric, .panel { box-shadow: none; animation: none; break-inside: avoid; }
+            .table-wrap { max-height: none; overflow: visible; }
+            .chart-scroll { overflow: visible; }
+            .chart-wrap { min-width: 0; height: 260px; }
+            .chart-wrap canvas { width: 100% !important; max-width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -456,8 +566,7 @@ $averageDelta = $dailyPm25 && $previousPm25
             <div>
                 <h1>Sensor Reports</h1>
                 <p>
-                    Record Files lists all <?php echo number_format(count($days)); ?> dates found in Firebase
-                    (<?php echo number_format($totalDeviceReadings); ?> device readings). Daily averages compare the selected date with the previous day.
+                    Generate daily, weekly, monthly, or custom-range reports with pollutant trends, PM2.5 alerts, and sensor filters.
                 </p>
             </div>
         </section>
@@ -465,66 +574,79 @@ $averageDelta = $dailyPm25 && $previousPm25
         <?php if ($error): ?>
             <div class="error"><?php echo htmlspecialchars($error); ?></div>
         <?php else: ?>
+            <?php if ($filterWarning): ?><div class="error"><?php echo htmlspecialchars($filterWarning); ?></div><?php endif; ?>
             <section class="summary">
-                <div class="metric"><span class="metric-label">Valid PM2.5 readings</span><strong class="metric-value"><?php echo count($dailyPm25); ?> / <?php echo count($dailyLogs); ?></strong></div>
-                <div class="metric"><span class="metric-label">Daily average PM2.5</span><strong class="metric-value"><?php echo $dailyPm25 ? number_format(array_sum($dailyPm25) / count($dailyPm25), 1) . ' µg/m³' : '--'; ?></strong></div>
-                <div class="metric"><span class="metric-label">Change vs previous day</span><strong class="metric-value"><?php echo $averageDelta === null ? '--' : (($averageDelta > 0 ? '+' : '') . number_format($averageDelta, 1) . ' µg/m³'); ?></strong></div>
-                <div class="metric"><span class="metric-label">Peak PM2.5</span><strong class="metric-value"><?php echo $maxPm25 === null ? '--' : number_format($maxPm25, 1) . ' µg/m³'; ?></strong></div>
-                <div class="metric"><span class="metric-label">Average temperature</span><strong class="metric-value"><?php echo $averageTemp === null ? '--' : number_format($averageTemp, 1) . ' °C'; ?></strong></div>
-                <div class="metric"><span class="metric-label">Average humidity</span><strong class="metric-value"><?php echo $averageHumidity === null ? '--' : number_format($averageHumidity, 1) . '%'; ?></strong></div>
+                <div class="metric"><span class="metric-label">Device readings</span><strong class="metric-value"><?php echo number_format(count($selectedLogs)); ?></strong></div>
+                <div class="metric"><span class="metric-label">Valid <?php echo htmlspecialchars($selectedMetric['label']); ?></span><strong class="metric-value"><?php echo number_format(count($metricValues)); ?> / <?php echo number_format(count($selectedLogs)); ?></strong></div>
+                <div class="metric"><span class="metric-label">Average <?php echo htmlspecialchars($selectedMetric['label']); ?></span><strong class="metric-value"><?php echo $pollutantValue($metricAverage); ?></strong></div>
+                <div class="metric"><span class="metric-label">Change vs previous period</span><strong class="metric-value"><?php echo $averageDelta === null ? '--' : (($averageDelta > 0 ? '+' : '') . number_format($averageDelta, 1) . ' ' . $selectedMetric['unit']); ?></strong></div>
+                <div class="metric"><span class="metric-label">Peak <?php echo htmlspecialchars($selectedMetric['label']); ?></span><strong class="metric-value"><?php echo $pollutantValue($metricPeak); ?></strong></div>
+                <div class="metric"><span class="metric-label">PM2.5 unhealthy / hazardous</span><strong class="metric-value"><?php echo number_format(count($highReadings)); ?></strong></div>
             </section>
 
-            <section class="alert-summary<?php echo $dailyHighReadings ? '' : ' clear'; ?>" aria-live="polite">
-                <?php if ($dailyHighReadings): ?>
-                    <?php $firstHighReading = $dailyHighReadings[0]; $latestHighReading = $dailyHighReadings[count($dailyHighReadings) - 1]; ?>
-                    <strong><?php echo count($dailyHighReadings); ?> unhealthy or hazardous PM2.5 readings on this date.</strong>
-                    First high reading: <?php echo date('h:i A', strtotime($firstHighReading['timestamp'])); ?>
+            <section class="alert-summary<?php echo $highReadings ? '' : ' clear'; ?>" aria-live="polite">
+                <?php if ($highReadings): ?>
+                    <?php $firstHighReading = $highReadings[0]; $latestHighReading = $highReadings[count($highReadings) - 1]; ?>
+                    <strong><?php echo number_format(count($highReadings)); ?> unhealthy or hazardous PM2.5 readings in this report.</strong>
+                    First: <?php echo date('M j, h:i A', strtotime($firstHighReading['timestamp'])); ?>
                     (<?php echo number_format((float) $firstHighReading['pm25'], 1); ?> µg/m³); latest:
-                    <?php echo date('h:i A', strtotime($latestHighReading['timestamp'])); ?>
+                    <?php echo date('M j, h:i A', strtotime($latestHighReading['timestamp'])); ?>
                     (<?php echo number_format((float) $latestHighReading['pm25'], 1); ?> µg/m³).
                 <?php else: ?>
-                    No unhealthy or hazardous PM2.5 readings were recorded for this day.
+                    No unhealthy or hazardous PM2.5 readings were recorded in this report.
                 <?php endif; ?>
             </section>
 
             <section class="panel chart-panel">
                 <div class="panel-head" style="padding: 0 0 18px; border-bottom: 0;">
                     <div>
-                        <h2>Daily Air Quality Trend</h2>
-                        <span>Device readings by timestamp. CO sensor (MQ-7) values are shown as raw ADC counts.</span>
+                        <h2><?php echo htmlspecialchars(ucfirst($period)); ?> <?php echo htmlspecialchars($selectedMetric['label']); ?> Trend</h2>
+                        <span>Daily reports show hourly averages; longer reports show daily averages.</span>
                     </div>
                 </div>
-                <div class="chart-scroll"><div class="chart-wrap"><canvas id="dailyChart"></canvas></div></div>
+                <?php if ($trendLabels): ?>
+                    <div class="chart-scroll"><div class="chart-wrap"><canvas id="reportChart"></canvas></div></div>
+                <?php else: ?>
+                    <div class="empty">No valid <?php echo htmlspecialchars($selectedMetric['label']); ?> measurements are available in this report.</div>
+                <?php endif; ?>
             </section>
 
             <section class="panel">
                 <div class="panel-head">
-                    <h2><?php echo date('l, F j, Y', strtotime($selectedDay)); ?></h2>
+                    <h2><?php echo htmlspecialchars($reportTitle); ?></h2>
                     <div class="panel-actions">
-                        <span><?php echo count($selectedLogs); ?> matching readings</span>
-                        <?php if ($selectedLogs): ?><button type="button" class="export-btn" onclick="exportReport()">Export CSV</button><?php endif; ?>
+                        <span><?php echo number_format($totalReportRows); ?> matching readings</span>
+                        <?php if ($selectedLogs): ?>
+                            <a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Export CSV</a>
+                            <button type="button" class="export-btn" onclick="window.print()">Print</button>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <?php if (!$selectedLogs): ?>
-                    <div class="empty">No sensor readings are available for this date.</div>
+                    <div class="empty">No sensor readings match the selected report filters.</div>
                 <?php else: ?>
                     <div class="table-wrap">
                         <table>
-                            <thead><tr><th>Time</th><th>Temperature</th><th>Humidity</th><th>PM2.5</th><th>MQ Gas (raw ADC)</th><th>PM2.5 classification</th></tr></thead>
+                            <thead><tr><th>Date and time</th><th>Sensor</th><th><?php echo htmlspecialchars($selectedMetric['label']); ?></th><th>PM2.5 category</th></tr></thead>
                             <tbody>
-                            <?php foreach ($selectedLogs as $log): ?>
+                            <?php foreach ($displayLogs as $log): ?>
                                 <tr>
-                                    <td><?php echo date('h:i:s A', strtotime($log['timestamp'] ?? '')); ?></td>
-                                    <td><?php echo is_numeric($log['temp'] ?? null) && (float) $log['temp'] >= -40 && (float) $log['temp'] <= 85 ? number_format((float) $log['temp'], 1) : '--'; ?> C</td>
-                                    <td><?php echo is_numeric($log['hum'] ?? null) && (float) $log['hum'] >= 0 && (float) $log['hum'] <= 100 ? number_format((float) $log['hum'], 1) : '--'; ?>%</td>
-                                    <td><?php echo is_numeric($log['pm25'] ?? null) && (float) $log['pm25'] >= 0 && (float) $log['pm25'] <= 1000 ? number_format((float) $log['pm25'], 1) : '--'; ?> µg/m³</td>
-                                    <td><?php echo is_numeric($log['co'] ?? null) && (float) $log['co'] >= 0 && (float) $log['co'] <= 4095 ? number_format((float) $log['co'], 1) : '--'; ?> raw ADC</td>
+                                    <td><?php echo date('M j, Y h:i:s A', strtotime($log['timestamp'] ?? '')); ?></td>
+                                    <td><?php echo htmlspecialchars($log['sensor_id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></td>
+                                    <td><?php echo $pollutantValue($log[$selectedMetric['field']] ?? null); ?></td>
                                     <?php $pmCategory = classifyPm25($log['pm25'] ?? null); ?>
                                     <td><span class="status" style="color:<?php echo htmlspecialchars($pmCategory['color'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>;"><?php echo htmlspecialchars($pmCategory['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+                    <div class="report-pagination">
+                        <span>Showing <?php echo number_format($firstReportRow); ?>–<?php echo number_format($lastReportRow); ?> of <?php echo number_format($totalReportRows); ?> readings · Page <?php echo number_format($reportPage); ?> of <?php echo number_format($totalReportPages); ?></span>
+                        <div class="panel-actions">
+                            <?php if ($reportPage > 1): ?><a class="view-date" href="<?php echo htmlspecialchars($reportPageUrl($reportPage - 1), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Previous</a><?php endif; ?>
+                            <?php if ($reportPage < $totalReportPages): ?><a class="view-date" href="<?php echo htmlspecialchars($reportPageUrl($reportPage + 1), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Next</a><?php endif; ?>
+                        </div>
                     </div>
                 <?php endif; ?>
             </section>
@@ -533,32 +655,45 @@ $averageDelta = $dailyPm25 && $previousPm25
                 <div class="panel-head">
                     <div>
                         <h2>Record Files</h2>
-                        <span>Choose a date to load its sensor records above.</span>
+                        <span><?php echo number_format(count($days)); ?> dates and <?php echo number_format($totalDeviceReadings); ?> device readings indexed in Firebase.</span>
                     </div>
                 </div>
                 <form class="date-form" method="get">
-                    <label for="day">Report date</label>
-                    <select id="day" name="day" onchange="this.form.submit()">
-                        <?php if (!$days): ?><option value="<?php echo htmlspecialchars($selectedDay); ?>">No readings yet</option><?php endif; ?>
-                        <?php foreach (array_keys($days) as $day): ?>
-                            <option value="<?php echo htmlspecialchars($day); ?>" <?php echo $day === $selectedDay ? 'selected' : ''; ?>>
-                                <?php echo date('M d, Y', strtotime($day)); ?>
-                            </option>
+                    <label for="period">Report period</label>
+                    <select id="period" name="period" onchange="toggleCustomDates()">
+                        <?php foreach (['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'custom' => 'Custom range'] as $periodValue => $periodLabel): ?>
+                            <option value="<?php echo $periodValue; ?>" <?php echo $period === $periodValue ? 'selected' : ''; ?>><?php echo $periodLabel; ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <label for="from">From</label>
-                    <input id="from" name="from" type="datetime-local" value="<?php echo htmlspecialchars($fromInput); ?>" aria-label="Starting date and time">
-                    <label for="to">To</label>
-                    <input id="to" name="to" type="datetime-local" value="<?php echo htmlspecialchars($toInput); ?>" aria-label="Ending date and time">
+                    <label for="date">Date</label>
+                    <input id="date" name="date" type="date" value="<?php echo htmlspecialchars($selectedDate); ?>" aria-label="Date used for daily, weekly, or monthly report">
+                    <span class="custom-date-field"><label for="from">From</label>
+                    <input id="from" name="from" type="date" value="<?php echo htmlspecialchars($fromInput); ?>" aria-label="Custom report start date"></span>
+                    <span class="custom-date-field"><label for="to">To</label>
+                    <input id="to" name="to" type="date" value="<?php echo htmlspecialchars($toInput); ?>" aria-label="Custom report end date"></span>
+                    <label for="pollutant">Pollutant</label>
+                    <select id="pollutant" name="pollutant">
+                        <?php foreach ($pollutantFields as $pollutantValue => $fieldDetails): ?>
+                            <option value="<?php echo $pollutantValue; ?>" <?php echo $pollutant === $pollutantValue ? 'selected' : ''; ?>><?php echo htmlspecialchars($fieldDetails['label']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label for="sensor">Sensor</label>
+                    <select id="sensor" name="sensor">
+                        <option value="">All sensors</option>
+                        <?php $sensorIds = array_keys($sensors); sort($sensorIds, SORT_NATURAL | SORT_FLAG_CASE); ?>
+                        <?php foreach ($sensorIds as $sensorId): ?>
+                            <option value="<?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" <?php echo $selectedSensor === $sensorId ? 'selected' : ''; ?>><?php echo htmlspecialchars($sensorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                     <input name="search" type="search" placeholder="Search time or value" value="<?php echo htmlspecialchars($searchTerm); ?>" aria-label="Search sensor records">
                     <button class="search-btn" type="submit">Search</button>
-                    <?php if ($searchTerm || $fromInput || $toInput): ?><a class="clear-search" href="sensor_reports.php?day=<?php echo urlencode($selectedDay); ?>">Clear</a><?php endif; ?>
+                    <a class="clear-search" href="sensor_reports.php">Clear filters</a>
                 </form>
-                <?php if ($days): ?>
-                    <div class="overall-reading">
-                        <span>Device Readings Across All Dates</span>
-                        <strong><?php echo number_format($totalDeviceReadings); ?></strong>
-                    </div>
+                <?php $hasIdentifiedSensors = count(array_diff(array_keys($sensors), ['Unidentified sensor'])) > 0; ?>
+                <?php if (!$hasIdentifiedSensors): ?>
+                    <p class="sidebar-note" style="margin:0 22px 16px;">
+                        Current readings have no sensor ID; they are grouped as “Unidentified sensor.” Configure a sensor ID to enable accurate filtering for new readings.
+                    </p>
                 <?php endif; ?>
                 <div class="table-wrap">
                     <table>
@@ -571,7 +706,7 @@ $averageDelta = $dailyPm25 && $previousPm25
                                 <tr>
                                     <td><?php echo date('l, F j, Y', strtotime($day)); ?></td>
                                     <td><?php echo number_format($dayReadingCount); ?></td>
-                                    <td><a class="view-date" href="sensor_reports.php?day=<?php echo urlencode($day); ?>">View records</a></td>
+                                    <td><a class="view-date" href="sensor_reports.php?period=daily&amp;date=<?php echo urlencode($day); ?>">View records</a></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -603,59 +738,41 @@ $averageDelta = $dailyPm25 && $previousPm25
             if (event.key === 'Escape') closeMobileSidebar();
         });
 
-        const reportRows = <?php echo json_encode(array_values($selectedLogs), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
-        const chartRows = reportRows.slice().reverse();
-        const chartLabels = chartRows.map(row => new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-        const chartCanvas = document.getElementById('dailyChart');
+        function toggleCustomDates() {
+            const isCustom = document.getElementById('period').value === 'custom';
+            document.querySelectorAll('.custom-date-field').forEach(field => {
+                field.style.display = isCustom ? 'contents' : 'none';
+            });
+            document.getElementById('from').required = isCustom;
+            document.getElementById('to').required = isCustom;
+        }
+        toggleCustomDates();
+
+        const chartLabels = <?php echo json_encode($trendLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+        const chartValues = <?php echo json_encode($trendValues, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+        const selectedPollutantUnit = <?php echo json_encode($selectedMetric['unit']); ?>;
+        const chartCanvas = document.getElementById('reportChart');
         if (chartCanvas) new Chart(chartCanvas, {
             type: 'line',
             data: {
                 labels: chartLabels,
-                datasets: [
-                    {
-                        label: 'PM2.5',
-                        data: chartRows.map(row => {
-                            if (row.pm25 === null || row.pm25 === undefined) return null;
-                            const value = Number(row.pm25);
-                            return Number.isFinite(value) && value >= 0 && value <= 1000 ? value : null;
-                        }),
-                        borderColor: '#168a68',
-                        backgroundColor: 'rgba(22,138,104,.12)',
-                        fill: true,
-                        tension: .35,
-                        yAxisID: 'air',
-                        pointBackgroundColor: context => AirshedAirQuality.classifyPm25(context.raw).color,
-                        pointBorderColor: context => AirshedAirQuality.classifyPm25(context.raw).color,
-                        segment: { borderColor: context => AirshedAirQuality.classifyPm25(context.p1.raw).color }
-                    },
-                    { label: 'Temperature', data: chartRows.map(row => {
-                        const value = row.temp === null || row.temp === undefined ? NaN : Number(row.temp);
-                        return Number.isFinite(value) && value >= -40 && value <= 85 ? value : null;
-                    }), borderColor: '#e76f51', tension: .35, yAxisID: 'weather' },
-                    { label: 'Humidity', data: chartRows.map(row => {
-                        const value = row.hum === null || row.hum === undefined ? NaN : Number(row.hum);
-                        return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
-                    }), borderColor: '#00a896', tension: .35, yAxisID: 'humidity' },
-                    { label: 'MQ Gas (raw ADC)', data: chartRows.map(row => {
-                        const value = row.co === null || row.co === undefined ? NaN : Number(row.co);
-                        return Number.isFinite(value) && value >= 0 && value <= 4095 ? value : null;
-                    }), borderColor: '#8e44ad', tension: .35, yAxisID: 'gas' }
-                ]
+                datasets: [{
+                    label: <?php echo json_encode($selectedMetric['label']); ?>,
+                    data: chartValues,
+                    borderColor: '#174ea6',
+                    backgroundColor: 'rgba(23,78,166,.12)',
+                    fill: false,
+                    tension: .35
+                }]
             },
-            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { air: { beginAtZero: true, position: 'left' }, weather: { beginAtZero: false, position: 'right', grid: { drawOnChartArea: false } }, humidity: { beginAtZero: true, position: 'left', display: false }, gas: { beginAtZero: true, position: 'right', display: false } } }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: { y: { title: { display: true, text: selectedPollutantUnit } } }
+            }
         });
 
-        function exportReport() {
-            const header = ['Timestamp', 'Temperature', 'Humidity', 'PM2.5', 'MQ Gas (raw ADC)', 'PM2.5 Classification'];
-            const rows = reportRows.map(row => [row.timestamp, row.temp, row.hum, row.pm25, row.co, AirshedAirQuality.classifyPm25(row.pm25).label]);
-            const csv = [header, ...rows].map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `Airshed_Report_<?php echo htmlspecialchars($selectedDay, ENT_QUOTES); ?>.csv`;
-            link.click();
-            URL.revokeObjectURL(link.href);
-        }
     </script>
 </body>
 </html>
