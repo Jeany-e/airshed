@@ -10,6 +10,17 @@ $submitted = false;
 $isAuthenticatedUser = isset($_SESSION['user_id']);
 $returnUrl = $isAuthenticatedUser ? 'user_dashboard.php' : 'public_portal.php';
 $returnLabel = $isAuthenticatedUser ? 'User Dashboard' : 'Public Portal';
+$barangays = [
+    'Balingayan', 'Balite', 'Baruyan', 'Batino', 'Bayanan I', 'Bayanan II', 'Biga', 'Bondoc',
+    'Bucayao', 'Buhuan', 'Bulusan', 'Calero', 'Camansihan', 'Camilmil', 'Canubing I', 'Canubing II',
+    'Comunal', 'Guinobatan', 'Gulod', 'Gutad', 'Ibaba East', 'Ibaba West', 'Ilaya', 'Lalud',
+    'Lazareto', 'Libis', 'Lumang Bayan', 'Mahal na Pangalan', 'Maidlang', 'Malad', 'Malamig',
+    'Managpi', 'Masipit', 'Nag-iba I', 'Nag-iba II', 'Navotas', 'Pachoca', 'Palhi', 'Panggalaan',
+    'Parang', 'Patas', 'Personas', 'Putingtubig', 'Salong', 'San Antonio', 'San Vicente Central',
+    'San Vicente East', 'San Vicente North', 'San Vicente South', 'San Vicente West', 'Santa Cruz',
+    'Santa Isabel', 'Santa Maria Village', 'Santa Rita', 'Santo Niño', 'Sapul', 'Silonay', 'Suqui',
+    'Tawagan', 'Tawiran', 'Tibag', 'Wawa'
+];
 
 if (isset($_POST['submit_report'])) {
     $type = trim($_POST['incident_type']);
@@ -274,8 +285,13 @@ if (isset($_POST['submit_report'])) {
         </div>
 
         <div class="form-group">
-            <label>Location</label>
-            <input type="text" name="location" placeholder="Where did this happen?" required>
+            <label for="location">Location</label>
+            <select id="location" name="location" required>
+                <option value="" selected disabled>Select a barangay</option>
+                <?php foreach ($barangays as $barangay): ?>
+                    <option value="<?php echo htmlspecialchars($barangay, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"><?php echo htmlspecialchars($barangay, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
 
         <div class="form-group">
