@@ -4,87 +4,133 @@ require __DIR__ . '/config.php';
 date_default_timezone_set('Asia/Manila');
 unset($_SESSION['sensor_reports_logs_cache']);
 $isAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
-$logs = [];
 $error = '';
-$reportRecordLimit = 5000;
-
-try {
-    $logs = firebaseRows('sensor_logs', [
-        'orderBy' => '"timestamp"',
-        'limitToLast' => $reportRecordLimit
-    ]);
-} catch (Throwable $exception) {
-    usleep(150000);
-    try {
-        $logs = firebaseRows('sensor_logs', [
-            'orderBy' => '"timestamp"',
-            'limitToLast' => $reportRecordLimit
-        ]);
-    } catch (Throwable $retryException) {
-        error_log('Sensor report history unavailable: ' . $retryException->getMessage());
-        $error = 'Sensor history is temporarily unavailable.';
-    }
-}
-$historyCapped = count($logs) >= $reportRecordLimit;
-
-$logs = array_values(array_filter($logs, function ($log) {
-    return ($log['source'] ?? '') === 'device';
-}));
-foreach ($logs as &$log) {
-    $log['temp'] = $log['temp'] ?? $log['temperature'] ?? null;
-    $log['hum'] = $log['hum'] ?? $log['humidity'] ?? null;
-    $log['co'] = $log['co'] ?? $log['co_ppm'] ?? null;
-    $log['pm25'] = $log['pm25'] ?? $log['pm2_5'] ?? $log['pm2.5'] ?? null;
-}
-unset($log);
-
-usort($logs, function ($a, $b) {
-    return strcmp($b['timestamp'] ?? '', $a['timestamp'] ?? '');
-});
-
-$days = [];
-foreach ($logs as $log) {
-    $timestamp = strtotime($log['timestamp'] ?? '');
-    if (!$timestamp) {
-        continue;
-    }
-    $day = date('Y-m-d', $timestamp);
-    $days[$day][] = $log;
-}
-
+$reportPageSize = 5000;
 $requestedDay = trim($_GET['day'] ?? '');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDay)) {
     $requestedDay = '';
 }
-$selectedDay = isset($days[$requestedDay]) ? $requestedDay : (array_key_first($days) ?: date('Y-m-d'));
-$selectedLogs = $days[$selectedDay] ?? [];
-$dailyLogs = $selectedLogs;
-$previousDay = date('Y-m-d', strtotime($selectedDay . ' -1 day'));
-$previousDayLogs = $days[$previousDay] ?? [];
 $searchTerm = trim($_GET['search'] ?? '');
 $fromInput = trim($_GET['from'] ?? '');
 $toInput = trim($_GET['to'] ?? '');
 $fromTimestamp = $fromInput ? strtotime($fromInput) : null;
 $toTimestamp = $toInput ? strtotime($toInput) : null;
+$days = [];
+$totalDeviceReadings = 0;
+$selectedLogs = [];
+$previousDayLogs = [];
 
-if ($searchTerm !== '' || $fromTimestamp || $toTimestamp) {
-    $selectedLogs = array_values(array_filter($selectedLogs, function ($log) use ($searchTerm, $fromTimestamp, $toTimestamp) {
-        $timestamp = strtotime($log['timestamp'] ?? '');
-        $haystack = strtolower(implode(' ', [
-            $log['timestamp'] ?? '',
-            $timestamp ? date('M d Y h:i A', $timestamp) : '',
-            $log['temp'] ?? '',
-            $log['hum'] ?? '',
-            $log['pm25'] ?? '',
-            $log['co'] ?? '',
-            $log['status'] ?? ''
-        ]));
+$fetchRows = function (array $query) {
+    try {
+        return firebaseRows('sensor_logs', $query);
+    } catch (Throwable $exception) {
+        usleep(150000);
+        return firebaseRows('sensor_logs', $query);
+    }
+};
 
-        return $timestamp
-            && (!$fromTimestamp || $timestamp >= $fromTimestamp)
-            && (!$toTimestamp || $timestamp <= $toTimestamp)
-            && ($searchTerm === '' || strpos($haystack, strtolower($searchTerm)) !== false);
-    }));
+$normalizeDeviceLog = function (array $log) {
+    $timestamp = strtotime($log['timestamp'] ?? '');
+    if (($log['source'] ?? '') !== 'device' || !$timestamp) {
+        return null;
+    }
+    $log['temp'] = $log['temp'] ?? $log['temperature'] ?? null;
+    $log['hum'] = $log['hum'] ?? $log['humidity'] ?? null;
+    $log['co'] = $log['co'] ?? $log['co_ppm'] ?? null;
+    $log['pm25'] = $log['pm25'] ?? $log['pm2_5'] ?? $log['pm2.5'] ?? null;
+    return $log;
+};
+
+$loadDayLogs = function ($day) use ($fetchRows, $normalizeDeviceLog) {
+    $dayStart = strtotime($day . ' 00:00:00');
+    $dayEnd = strtotime($day . ' +1 day') - 1;
+    $rows = $fetchRows([
+        'orderBy' => '"timestamp"',
+        'startAt' => json_encode(gmdate('c', $dayStart)),
+        'endAt' => json_encode(gmdate('c', $dayEnd))
+    ]);
+    $dayLogs = [];
+    foreach ($rows as $row) {
+        $log = $normalizeDeviceLog($row);
+        if ($log !== null && date('Y-m-d', strtotime($log['timestamp'])) === $day) {
+            $dayLogs[] = $log;
+        }
+    }
+    usort($dayLogs, function ($a, $b) {
+        return strcmp($b['timestamp'] ?? '', $a['timestamp'] ?? '');
+    });
+    return $dayLogs;
+};
+
+try {
+    $cursorKey = null;
+    do {
+        $query = [
+            'orderBy' => '"$key"',
+            'limitToFirst' => $cursorKey === null ? $reportPageSize : $reportPageSize + 1
+        ];
+        if ($cursorKey !== null) {
+            $query['startAt'] = json_encode($cursorKey);
+        }
+        $page = $fetchRows($query);
+        usort($page, function ($a, $b) {
+            return strcmp($a['id'] ?? '', $b['id'] ?? '');
+        });
+        if ($cursorKey !== null) {
+            $page = array_values(array_filter($page, function ($row) use ($cursorKey) {
+                return strcmp($row['id'] ?? '', $cursorKey) > 0;
+            }));
+        }
+        $pageCount = count($page);
+        foreach ($page as $record) {
+            $cursorKey = $record['id'] ?? $cursorKey;
+            $log = $normalizeDeviceLog($record);
+            if ($log === null) {
+                continue;
+            }
+            $day = date('Y-m-d', strtotime($log['timestamp']));
+            $days[$day] = ($days[$day] ?? 0) + 1;
+            $totalDeviceReadings++;
+        }
+    } while ($pageCount >= $reportPageSize);
+
+    krsort($days, SORT_STRING);
+    $selectedDay = isset($days[$requestedDay])
+        ? $requestedDay
+        : (array_key_first($days) ?: date('Y-m-d'));
+    $previousDay = date('Y-m-d', strtotime($selectedDay . ' -1 day'));
+    $selectedLogs = $loadDayLogs($selectedDay);
+    $previousDayLogs = isset($days[$previousDay]) ? $loadDayLogs($previousDay) : [];
+    $dailyLogs = $selectedLogs;
+
+    if ($searchTerm !== '' || $fromTimestamp || $toTimestamp) {
+        $selectedLogs = array_values(array_filter($selectedLogs, function ($log) use ($searchTerm, $fromTimestamp, $toTimestamp) {
+            $timestamp = strtotime($log['timestamp'] ?? '');
+            $haystack = strtolower(implode(' ', [
+                $log['timestamp'] ?? '',
+                $timestamp ? date('M d Y h:i A', $timestamp) : '',
+                $log['temp'] ?? '',
+                $log['hum'] ?? '',
+                $log['pm25'] ?? '',
+                $log['co'] ?? '',
+                $log['status'] ?? ''
+            ]));
+
+            return $timestamp
+                && (!$fromTimestamp || $timestamp >= $fromTimestamp)
+                && (!$toTimestamp || $timestamp <= $toTimestamp)
+                && ($searchTerm === '' || strpos($haystack, strtolower($searchTerm)) !== false);
+        }));
+    }
+} catch (Throwable $exception) {
+    error_log('Sensor report history unavailable: ' . $exception->getMessage());
+    $error = 'Sensor history is temporarily unavailable.';
+    $days = [];
+    $selectedLogs = [];
+    $previousDayLogs = [];
+    $dailyLogs = [];
+    $selectedDay = $requestedDay ?: date('Y-m-d');
+    $previousDay = date('Y-m-d', strtotime($selectedDay . ' -1 day'));
 }
 
 $average = function ($field, array $rows) {
@@ -410,12 +456,8 @@ $averageDelta = $dailyPm25 && $previousPm25
             <div>
                 <h1>Sensor Reports</h1>
                 <p>
-                    Showing up to <?php echo number_format($reportRecordLimit); ?> of the most recent sensor-log records.
-                    <?php if ($historyCapped): ?>
-                        The history limit was reached, so daily averages and comparisons may exclude older readings from that day.
-                    <?php else: ?>
-                        Daily averages and comparisons use the device readings loaded here.
-                    <?php endif; ?>
+                    Record Files lists all <?php echo number_format(count($days)); ?> dates found in Firebase
+                    (<?php echo number_format($totalDeviceReadings); ?> device readings). Daily averages compare the selected date with the previous day.
                 </p>
             </div>
         </section>
@@ -514,8 +556,8 @@ $averageDelta = $dailyPm25 && $previousPm25
                 </form>
                 <?php if ($days): ?>
                     <div class="overall-reading">
-                        <span>Recent Readings Loaded</span>
-                        <strong><?php echo count($logs); ?></strong>
+                        <span>Device Readings Across All Dates</span>
+                        <strong><?php echo number_format($totalDeviceReadings); ?></strong>
                     </div>
                 <?php endif; ?>
                 <div class="table-wrap">
@@ -525,10 +567,10 @@ $averageDelta = $dailyPm25 && $previousPm25
                         <?php if (!$days): ?>
                             <tr><td colspan="3">No record files available.</td></tr>
                         <?php else: ?>
-                            <?php foreach ($days as $day => $dayLogs): ?>
+                            <?php foreach ($days as $day => $dayReadingCount): ?>
                                 <tr>
                                     <td><?php echo date('l, F j, Y', strtotime($day)); ?></td>
-                                    <td><?php echo count($dayLogs); ?></td>
+                                    <td><?php echo number_format($dayReadingCount); ?></td>
                                     <td><a class="view-date" href="sensor_reports.php?day=<?php echo urlencode($day); ?>">View records</a></td>
                                 </tr>
                             <?php endforeach; ?>
