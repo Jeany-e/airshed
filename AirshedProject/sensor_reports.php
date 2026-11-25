@@ -18,17 +18,27 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate) || !checkdate((int) sub
     $requestedDate = '';
 }
 $recordFileSearch = trim($_GET['file_search'] ?? '');
-$fromInput = trim($_GET['from'] ?? '');
-$toInput = trim($_GET['to'] ?? '');
-$validDateInput = function ($value) {
-    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)
-        && checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4));
+$rawFromInput = trim($_GET['from'] ?? '');
+$rawToInput = trim($_GET['to'] ?? '');
+$normalizeDateInput = function ($value) {
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)
+        && checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4))) {
+        return $value;
+    }
+    if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $value)) {
+        $date = DateTime::createFromFormat('!d/m/Y', $value);
+        $errors = DateTime::getLastErrors();
+        if ($date && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))) {
+            return $date->format('Y-m-d');
+        }
+    }
+    return '';
 };
-if (!$validDateInput($fromInput)) {
-    $fromInput = '';
-}
-if (!$validDateInput($toInput)) {
-    $toInput = '';
+$fromInput = $normalizeDateInput($rawFromInput);
+$toInput = $normalizeDateInput($rawToInput);
+$invalidDateInput = ($rawFromInput !== '' && $fromInput === '') || ($rawToInput !== '' && $toInput === '');
+if ($invalidDateInput) {
+    $filterWarning = 'Enter valid dates using DD/MM/YYYY.';
 }
 $selectedSensor = trim($_GET['sensor'] ?? '');
 $days = [];
@@ -133,7 +143,7 @@ try {
         if ($fromInput && $toInput && $fromInput <= $toInput) {
             $rangeStartDate = $fromInput;
             $rangeEndDate = $toInput;
-        } else {
+        } elseif (!$filterWarning) {
             $filterWarning = 'Choose valid start and end dates, with the start date on or before the end date.';
         }
     }
@@ -230,6 +240,15 @@ $lastReportRow = min($reportPage * $displayPageSize, $totalReportRows);
 $displayLogs = array_slice($selectedLogs, ($reportPage - 1) * $displayPageSize, $displayPageSize);
 $generatorFromDate = $period === 'custom' && $filterWarning ? $fromInput : $rangeStartDate;
 $generatorToDate = $period === 'custom' && $filterWarning ? $toInput : $rangeEndDate;
+$formatDateInput = function ($value) {
+    return $value ? date('d/m/Y', strtotime($value)) : '';
+};
+$displayFromDate = $invalidDateInput && $fromInput === '' && $rawFromInput !== ''
+    ? $rawFromInput
+    : $formatDateInput($generatorFromDate);
+$displayToDate = $invalidDateInput && $toInput === '' && $rawToInput !== ''
+    ? $rawToInput
+    : $formatDateInput($generatorToDate);
 $reportQuery = $_GET;
 unset($reportQuery['export'], $reportQuery['report_page'], $reportQuery['search'], $reportQuery['pollutant']);
 $generatorQuery = $reportQuery;
@@ -639,9 +658,9 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                         <?php endforeach; ?>
                     </select>
                     <label for="from">From date</label>
-                    <input id="from" name="from" type="date" value="<?php echo htmlspecialchars($generatorFromDate); ?>" aria-label="Report start date" onchange="updateReportDateRange()" required>
+                    <input id="from" name="from" type="text" inputmode="numeric" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" maxlength="10" placeholder="DD/MM/YYYY" value="<?php echo htmlspecialchars($displayFromDate, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" aria-label="Report start date (DD/MM/YYYY)" title="Use DD/MM/YYYY" onchange="updateReportDateRange()" required>
                     <label for="to">To date</label>
-                    <input id="to" name="to" type="date" value="<?php echo htmlspecialchars($generatorToDate); ?>" aria-label="Report end date" required <?php echo $period === 'custom' ? '' : 'readonly'; ?>>
+                    <input id="to" name="to" type="text" inputmode="numeric" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" maxlength="10" placeholder="DD/MM/YYYY" value="<?php echo htmlspecialchars($displayToDate, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" aria-label="Report end date (DD/MM/YYYY)" title="Use DD/MM/YYYY" required <?php echo $period === 'custom' ? '' : 'readonly'; ?>>
                     <label for="sensor">Sensor</label>
                     <select id="sensor" name="sensor">
                         <option value="">All sensors</option>
@@ -653,7 +672,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                     <button class="search-btn" type="submit">Generate Report</button>
                     <?php if ($selectedLogs): ?><a class="export-btn" href="<?php echo htmlspecialchars($exportUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">Download CSV</a><?php endif; ?>
                 </form>
-                <p class="report-period-help">Daily covers one day; weekly covers Monday–Sunday; monthly covers the full calendar month. Custom range uses the dates entered.</p>
+                <p class="report-period-help">Enter dates as DD/MM/YYYY. Daily covers one day; weekly covers Monday–Sunday; monthly covers the full calendar month. Custom range uses the dates entered.</p>
                 <?php $hasIdentifiedSensors = count(array_diff(array_keys($sensors), ['Unidentified sensor'])) > 0; ?>
                 <?php if (!$hasIdentifiedSensors): ?>
                     <p class="sidebar-note" style="margin:0 22px 16px;">
@@ -750,10 +769,21 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         });
 
         function formatLocalDate(date) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            return `${day}/${month}/${date.getFullYear()}`;
+        }
+
+        function parseLocalDate(value) {
+            const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim());
+            if (!match) return null;
+
+            const day = Number(match[1]);
+            const month = Number(match[2]) - 1;
+            const year = Number(match[3]);
+            const date = new Date(year, month, day, 12);
+            if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+            return date;
         }
 
         function updateReportDateRange() {
@@ -767,8 +797,8 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             toInput.readOnly = !customRange;
             if (customRange || !fromInput.value) return;
 
-            const start = new Date(`${fromInput.value}T12:00:00`);
-            if (Number.isNaN(start.getTime())) return;
+            const start = parseLocalDate(fromInput.value);
+            if (!start) return;
             let rangeStart = new Date(start);
             let rangeEnd = new Date(start);
             if (period === 'weekly') {
