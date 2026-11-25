@@ -667,6 +667,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                 <?php endif; ?>
             </section>
 
+            <?php if ($isAdmin): ?>
             <section class="panel">
                 <div class="panel-head">
                     <h2><?php echo htmlspecialchars($reportTitle); ?></h2>
@@ -738,6 +739,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                     </div>
                 <?php endif; ?>
             </section>
+            <?php endif; ?>
 
             <section class="panel record-files">
                 <div class="panel-head">
@@ -869,8 +871,10 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             document.getElementById('reportChartTitle').textContent = `${reportPeriodLabel} ${config.label} Trend`;
             document.getElementById('reportChartScroll').hidden = !hasData;
             document.getElementById('reportChartEmpty').hidden = hasData;
-            document.getElementById('readingMetricHeader').textContent = config.heading;
-            document.getElementById('pm25CategoryHeader').hidden = !config.hasCategory;
+            const readingMetricHeader = document.getElementById('readingMetricHeader');
+            const pm25CategoryHeader = document.getElementById('pm25CategoryHeader');
+            if (readingMetricHeader) readingMetricHeader.textContent = config.heading;
+            if (pm25CategoryHeader) pm25CategoryHeader.hidden = !config.hasCategory;
             document.querySelectorAll('.report-reading-row').forEach(function (row) {
                 row.querySelector('.reading-metric-value').textContent = row.dataset[metric];
                 row.querySelector('.pm25-category').hidden = !config.hasCategory;
