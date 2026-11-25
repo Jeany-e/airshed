@@ -4,6 +4,7 @@ require __DIR__ . '/config.php';
 date_default_timezone_set('Asia/Manila');
 unset($_SESSION['sensor_reports_logs_cache']);
 $isAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+$showRecordsView = !$isAdmin && ($_GET['view'] ?? '') === 'records';
 $error = '';
 $filterWarning = '';
 $reportPageSize = 5000;
@@ -270,6 +271,10 @@ unset($reportQuery['export'], $reportQuery['report_page'], $reportQuery['search'
 $generatorQuery = $reportQuery;
 unset($generatorQuery['file_search']);
 $clearFileSearchUrl = $generatorQuery ? 'sensor_reports.php?' . http_build_query($generatorQuery) : 'sensor_reports.php';
+$backToRecordFilesQuery = $recordFileSearch !== '' ? ['file_search' => $recordFileSearch] : [];
+$backToRecordFilesUrl = $backToRecordFilesQuery
+    ? 'sensor_reports.php?' . http_build_query($backToRecordFilesQuery)
+    : 'sensor_reports.php';
 $filteredDays = $days;
 if ($recordFileSearch !== '') {
     $normalizedSearch = strtolower(preg_replace('/[^a-z0-9]/i', '', $recordFileSearch));
@@ -622,7 +627,12 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
         </section>
 
         <?php if ($error): ?>
-            <div class="error"><?php echo htmlspecialchars($error); ?></div>
+            <div class="error">
+                <?php echo htmlspecialchars($error); ?>
+                <?php if ($showRecordsView): ?>
+                    <p><a class="view-date" href="<?php echo htmlspecialchars($backToRecordFilesUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">← Back to Record Files</a></p>
+                <?php endif; ?>
+            </div>
         <?php else: ?>
             <?php if ($filterWarning): ?><div class="error"><?php echo htmlspecialchars($filterWarning); ?></div><?php endif; ?>
             <section class="summary">
@@ -667,17 +677,22 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                 <?php endif; ?>
             </section>
 
-            <?php if ($isAdmin): ?>
+            <?php if ($isAdmin || $showRecordsView): ?>
             <section class="panel">
                 <div class="panel-head">
                     <h2><?php echo htmlspecialchars($reportTitle); ?></h2>
                     <div class="panel-actions">
-                        <span><?php echo number_format($totalReportRows); ?> matching readings</span>
-                        <?php if ($selectedLogs): ?>
-                            <button type="button" class="export-btn" onclick="window.print()">Print</button>
+                        <?php if ($showRecordsView): ?>
+                            <a class="view-date" href="<?php echo htmlspecialchars($backToRecordFilesUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">← Back to Record Files</a>
+                        <?php else: ?>
+                            <span><?php echo number_format($totalReportRows); ?> matching readings</span>
+                            <?php if ($selectedLogs): ?>
+                                <button type="button" class="export-btn" onclick="window.print()">Print</button>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if ($isAdmin): ?>
                 <form class="date-form report-generator-form" method="get">
                     <label for="period">Report period</label>
                     <select id="period" name="period" onchange="updateReportDateRange()">
@@ -706,6 +721,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                     <p class="sidebar-note" style="margin:0 22px 16px;">
                         Current readings have no sensor ID; they are grouped as “Unidentified sensor.” Configure a sensor ID to enable accurate filtering for new readings.
                     </p>
+                <?php endif; ?>
                 <?php endif; ?>
                 <?php if (!$selectedLogs): ?>
                     <div class="empty">No sensor readings match the selected report filters.</div>
@@ -741,6 +757,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
             </section>
             <?php endif; ?>
 
+            <?php if (!$showRecordsView): ?>
             <section class="panel record-files">
                 <div class="panel-head">
                     <div>
@@ -769,7 +786,18 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                                 <tr>
                                     <td><?php echo date('l, F j, Y', strtotime($day)); ?></td>
                                     <td><?php echo number_format($dayReadingCount); ?></td>
-                                    <td><a class="view-date" href="sensor_reports.php?period=daily&amp;from=<?php echo urlencode($day); ?>&amp;to=<?php echo urlencode($day); ?>">View records</a></td>
+                                    <td>
+                                        <?php
+                                        $viewRecordsQuery = ['period' => 'daily', 'from' => $day, 'to' => $day];
+                                        if (!$isAdmin) {
+                                            $viewRecordsQuery['view'] = 'records';
+                                            if ($recordFileSearch !== '') {
+                                                $viewRecordsQuery['file_search'] = $recordFileSearch;
+                                            }
+                                        }
+                                        ?>
+                                        <a class="view-date" href="sensor_reports.php?<?php echo htmlspecialchars(http_build_query($viewRecordsQuery), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">View records</a>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -777,6 +805,7 @@ if (($_GET['export'] ?? '') === 'csv' && !$error) {
                     </table>
                 </div>
             </section>
+            <?php endif; ?>
         <?php endif; ?>
     </main>
         </div>
